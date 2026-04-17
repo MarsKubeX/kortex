@@ -62,6 +62,11 @@ vi.mock(import('./guided-setup-steps'), async importOriginal => {
       agent: 'opencode',
       agentVariant: 'opencode',
       model: '',
+      anthropicApiKey: '',
+      vertexProjectId: '',
+      vertexRegion: 'us-east5',
+      vertexMountGcloud: true,
+      vertexMountClaudeConfig: false,
     }),
   };
 });

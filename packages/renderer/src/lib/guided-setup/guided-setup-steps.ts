@@ -36,6 +36,11 @@ export interface OnboardingState {
   agent: string;
   agentVariant: string;
   model: string;
+  anthropicApiKey: string;
+  vertexProjectId: string;
+  vertexRegion: string;
+  vertexMountGcloud: boolean;
+  vertexMountClaudeConfig: boolean;
 }
 
 export interface GuidedSetupStepProps {
@@ -60,6 +65,11 @@ export function createDefaultOnboardingState(): OnboardingState {
     agent: 'opencode',
     agentVariant: 'opencode',
     model: '',
+    anthropicApiKey: '',
+    vertexProjectId: '',
+    vertexRegion: 'us-east5',
+    vertexMountGcloud: true,
+    vertexMountClaudeConfig: false,
   };
 }
 
