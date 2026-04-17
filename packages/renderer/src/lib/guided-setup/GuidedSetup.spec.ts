@@ -22,7 +22,7 @@ import { faBrain, faCheckCircle, faRobot } from '@fortawesome/free-solid-svg-ico
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import type { GuidedSetupStep } from './guided-setup-steps';
+import type { GuidedSetupStep, OnboardingState } from './guided-setup-steps';
 import GuidedSetup from './GuidedSetup.svelte';
 
 vi.mock(import('./guided-setup-steps'), async importOriginal => {
@@ -58,6 +58,11 @@ vi.mock(import('./guided-setup-steps'), async importOriginal => {
         isSkippable: false,
       },
     ] satisfies GuidedSetupStep[],
+    createDefaultOnboardingState: (): OnboardingState => ({
+      agent: 'opencode',
+      agentVariant: 'opencode',
+      model: '',
+    }),
   };
 });
 
@@ -92,7 +97,7 @@ test('first step is active on mount', () => {
 test('"Continue" advances to next step', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  const continueButton = screen.getByRole('button', { name: 'Continue' });
+  const continueButton = screen.getByRole('button', { name: /Continue/ });
   await fireEvent.click(continueButton);
 
   const secondStepButton = screen.getByRole('button', { name: 'Step B step' });
@@ -112,7 +117,7 @@ test('"Skip" advances to next step', async () => {
 test('completed steps are tracked after Continue', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  const continueButton = screen.getByRole('button', { name: 'Continue' });
+  const continueButton = screen.getByRole('button', { name: /Continue/ });
   await fireEvent.click(continueButton);
 
   const firstStepButton = screen.getByRole('button', { name: 'Step A step' });
@@ -133,20 +138,20 @@ test('skipped steps are not marked completed', async () => {
 test('last step shows "Go to Dashboard" instead of "Continue"', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
-  expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Go to Dashboard' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Continue/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Go to Dashboard/ })).toBeInTheDocument();
 });
 
 test('dispatches close event when finishing on last step', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
-  const dashboardButton = screen.getByRole('button', { name: 'Go to Dashboard' });
+  const dashboardButton = screen.getByRole('button', { name: /Go to Dashboard/ });
   await fireEvent.click(dashboardButton);
 
   expect(closeMock).toHaveBeenCalled();
@@ -155,7 +160,7 @@ test('dispatches close event when finishing on last step', async () => {
 test('clicking on completed step navigates back to it', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
   const firstStepButton = screen.getByRole('button', { name: 'Step A step' });
   await fireEvent.click(firstStepButton);
@@ -184,8 +189,8 @@ test('stepper progress bar has correct number of connector lines', () => {
 test('Skip button is not shown for non-skippable steps', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-  await fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
   expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
 });

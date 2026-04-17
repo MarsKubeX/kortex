@@ -17,12 +17,32 @@
  ***********************************************************************/
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
+import { faRobot } from '@fortawesome/free-solid-svg-icons';
 import type { Component } from 'svelte';
+
+import CodingAgentStep from './CodingAgentStep.svelte';
+
+export interface AgentTileData {
+  key: string;
+  cliAgent: string;
+  title: string;
+  description: string;
+  icon: IconDefinition;
+  iconBgClass: string;
+  recommended: boolean;
+}
+
+export interface OnboardingState {
+  agent: string;
+  agentVariant: string;
+  model: string;
+}
 
 export interface GuidedSetupStepProps {
   stepId: string;
   title: string;
   description: string;
+  onboarding: OnboardingState;
 }
 
 export interface GuidedSetupStep {
@@ -35,4 +55,22 @@ export interface GuidedSetupStep {
   isSkippable: boolean;
 }
 
-export const guidedSetupSteps: GuidedSetupStep[] = [];
+export function createDefaultOnboardingState(): OnboardingState {
+  return {
+    agent: 'opencode',
+    agentVariant: 'opencode',
+    model: '',
+  };
+}
+
+export const guidedSetupSteps: GuidedSetupStep[] = [
+  {
+    id: 'coding-agent',
+    title: 'Coding agent',
+    description: 'Pick the default coding agent runtime.',
+    icon: faRobot,
+    component: CodingAgentStep,
+    isComplete: (): boolean => false,
+    isSkippable: true,
+  },
+];
