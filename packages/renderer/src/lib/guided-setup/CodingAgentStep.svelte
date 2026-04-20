@@ -1,43 +1,46 @@
 <script lang="ts">
 import { faClaude } from '@fortawesome/free-brands-svg-icons';
 import { faCircleCheck, faCloud, faDesktop, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
-import { Button } from '@podman-desktop/ui-svelte';
+import { Button, Checkbox, Link, Spinner } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 import { untrack } from 'svelte';
 
-import AgentTileCard from './AgentTileCard.svelte';
-import type { AgentTileData, GuidedSetupStepProps } from './guided-setup-steps';
+import type { CardSelectorOption } from '/@/lib/ui/CardSelector.svelte';
+import CardSelector from '/@/lib/ui/CardSelector.svelte';
+import PasswordInput from '/@/lib/ui/PasswordInput.svelte';
+
+import type { AgentVariant, CliAgent, GuidedSetupStepProps } from './guided-setup-steps';
 
 let { title, description, onboarding }: GuidedSetupStepProps = $props();
 
-const agents: AgentTileData[] = [
+const variantToCliAgent: Record<AgentVariant, CliAgent> = {
+  opencode: 'opencode',
+  claude: 'claude',
+  'claude-vertex': 'claude',
+};
+
+const agentOptions: CardSelectorOption[] = [
   {
-    key: 'opencode',
-    cliAgent: 'opencode',
+    value: 'opencode',
     title: 'OpenCode',
+    badge: 'Recommended',
     description:
       'Open-source agent on your machine \u2014 local models via Ollama or Ramalama, or cloud APIs (OpenAI, Gemini, and other providers OpenCode supports).',
     icon: faDesktop,
-    iconBgClass: 'bg-gray-700',
-    recommended: true,
   },
   {
-    key: 'claude',
-    cliAgent: 'claude',
+    value: 'claude',
     title: 'Claude Code',
+    badge: 'Anthropic',
     description: 'Anthropic Claude in the terminal \u2014 uses the Anthropic API or your org bridge.',
     icon: faClaude,
-    iconBgClass: 'bg-amber-900/40',
-    recommended: false,
   },
   {
-    key: 'claude-vertex',
-    cliAgent: 'claude',
+    value: 'claude-vertex',
     title: 'Claude Code + Vertex AI',
+    badge: 'Vertex AI',
     description: 'Claude Code with models served on Google Cloud Vertex AI instead of the Anthropic API.',
     icon: faCloud,
-    iconBgClass: 'bg-blue-900/30',
-    recommended: false,
   },
 ];
 
@@ -52,10 +55,10 @@ type ProbeStatus = 'idle' | 'checking' | 'detected' | 'not-found';
 let probeStatus: ProbeStatus = $state('idle');
 
 $effect(() => {
-  const agent = agents.find(a => a.key === selectedVariant);
-  if (agent) {
-    onboarding.agent = agent.cliAgent;
-    onboarding.agentVariant = selectedVariant;
+  const cliAgent = variantToCliAgent[selectedVariant as AgentVariant];
+  if (cliAgent) {
+    onboarding.agent = cliAgent;
+    onboarding.agentVariant = selectedVariant as AgentVariant;
   }
   onboarding.anthropicApiKey = anthropicApiKey;
   onboarding.vertexProjectId = vertexProjectId;
@@ -63,10 +66,6 @@ $effect(() => {
   onboarding.vertexMountGcloud = vertexMountGcloud;
   onboarding.vertexMountClaudeConfig = vertexMountClaudeConfig;
 });
-
-function selectAgent(agent: AgentTileData): void {
-  selectedVariant = agent.key;
-}
 
 async function probeOllama(): Promise<boolean> {
   try {
@@ -112,16 +111,11 @@ $effect(() => {
 <div class="mx-auto max-w-3xl py-4">
   <h2 class="text-xl font-semibold text-(--pd-content-card-text) mb-1">{title}</h2>
   <p class="text-sm text-(--pd-content-card-text) opacity-60 mb-6">
-    {description} The API notes below update for your choice. You can change this later in settings.
+    {description}
   </p>
 
-  <div class="grid grid-cols-3 gap-3 mb-8" role="radiogroup" aria-label="Coding agent">
-    {#each agents as agent (agent.key)}
-      <AgentTileCard
-        {agent}
-        selected={selectedVariant === agent.key}
-        onclick={selectAgent.bind(undefined, agent)} />
-    {/each}
+  <div class="mb-8">
+    <CardSelector label="Coding agent" options={agentOptions} bind:selected={selectedVariant} required />
   </div>
 
   {#if selectedVariant === 'opencode'}
@@ -135,7 +129,7 @@ $effect(() => {
 
       {#if probeStatus === 'checking'}
         <div class="flex items-center gap-3 rounded-lg bg-(--pd-content-card-bg) p-4" role="status" aria-live="polite" data-testid="probe-checking">
-          <div class="h-5 w-5 animate-spin rounded-full border-2 border-(--pd-content-card-text) border-t-transparent" aria-hidden="true"></div>
+          <Spinner size="1.25em" />
           <div>
             <strong class="text-sm text-(--pd-content-card-text)">Checking local runtimes\u2026</strong>
             <p class="text-xs text-(--pd-content-card-text) opacity-50 mt-0.5">Looking for Ollama or Ramalama on this machine.</p>
@@ -156,9 +150,9 @@ $effect(() => {
             <strong class="text-sm text-amber-300">No local model server detected</strong>
             <p class="text-xs text-amber-300/70 mt-1 leading-relaxed">
               Install and start
-              <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" class="text-amber-200 font-semibold hover:underline">Ollama</a>
+              <Link on:click={(): Promise<void> => window.openExternal('https://ollama.com')}>Ollama</Link>
               or
-              <a href="https://github.com/containers/ramalama" target="_blank" rel="noopener noreferrer" class="text-amber-200 font-semibold hover:underline">Ramalama</a>,
+              <Link on:click={(): Promise<void> => window.openExternal('https://github.com/containers/ramalama')}>Ramalama</Link>,
               pull at least one model, then run <strong>Check again</strong>.
             </p>
             <Button type="secondary" class="mt-3" aria-label="Check again" onclick={handleRetryProbe}>Check again</Button>
@@ -175,17 +169,13 @@ $effect(() => {
         Claude Code uses the <strong>Anthropic API</strong> unless your team routes traffic elsewhere.
         Optionally store a key now (encrypted as <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">ANTHROPIC_API_KEY</code>).
       </p>
-      <label class="block">
+      <div>
         <span class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50">API key (optional)</span>
-        <input
-          type="password"
-          class="mt-1 w-full rounded-lg border border-(--pd-content-divider) bg-(--pd-content-card-bg) px-3 py-2 text-sm text-(--pd-content-card-text) placeholder:opacity-40 focus:outline-none focus:border-(--pd-content-card-border-selected)"
+        <PasswordInput
+          id="anthropic-api-key"
           placeholder="sk-ant-..."
-          bind:value={anthropicApiKey}
-          data-testid="anthropic-api-key-input"
-          autocomplete="off"
-          spellcheck="false" />
-      </label>
+          bind:password={anthropicApiKey} />
+      </div>
     </div>
   {:else if selectedVariant === 'claude-vertex'}
     <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6" data-testid="vertex-panel">
@@ -233,19 +223,23 @@ $effect(() => {
         <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-3">
           Mounts (add under <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">claude.mounts</code> in the same file):
         </p>
-        <label class="flex items-center gap-2 cursor-pointer mb-2">
-          <input type="checkbox" bind:checked={vertexMountGcloud} data-testid="vertex-mount-gcloud" class="accent-(--pd-button-primary-bg)" />
-          <span class="text-xs text-(--pd-content-card-text)">
-            Mount <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">$HOME/.config/gcloud</code> read-only for application default credentials
-          </span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" bind:checked={vertexMountClaudeConfig} data-testid="vertex-mount-claude-config" class="accent-(--pd-button-primary-bg)" />
-          <span class="text-xs text-(--pd-content-card-text)">
-            Also mount <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.claude</code> and
-            <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.claude.json</code> (optional; reuse host Claude Code settings)
-          </span>
-        </label>
+        <div class="flex flex-col gap-2">
+          <Checkbox
+            title="Mount gcloud credentials"
+            bind:checked={vertexMountGcloud}>
+            <span class="text-xs text-(--pd-content-card-text)">
+              Mount <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">$HOME/.config/gcloud</code> read-only for application default credentials
+            </span>
+          </Checkbox>
+          <Checkbox
+            title="Mount Claude config"
+            bind:checked={vertexMountClaudeConfig}>
+            <span class="text-xs text-(--pd-content-card-text)">
+              Also mount <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.claude</code> and
+              <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.claude.json</code> (optional; reuse host Claude Code settings)
+            </span>
+          </Checkbox>
+        </div>
       </div>
 
       <p class="text-xs text-(--pd-content-card-text) opacity-40 mt-4 leading-relaxed">

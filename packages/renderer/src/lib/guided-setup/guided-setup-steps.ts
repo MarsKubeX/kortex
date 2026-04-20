@@ -25,16 +25,6 @@ import CodingAgentStep from './CodingAgentStep.svelte';
 export type CliAgent = 'opencode' | 'claude';
 export type AgentVariant = 'opencode' | 'claude' | 'claude-vertex';
 
-export interface AgentTileData {
-  key: AgentVariant;
-  cliAgent: CliAgent;
-  title: string;
-  description: string;
-  icon: IconDefinition;
-  iconBgClass: string;
-  recommended: boolean;
-}
-
 export interface OnboardingState {
   agent: CliAgent;
   agentVariant: AgentVariant;
@@ -79,8 +69,9 @@ export function createDefaultOnboardingState(): OnboardingState {
 export const guidedSetupSteps: GuidedSetupStep[] = [
   {
     id: 'coding-agent',
-    title: 'Coding agent',
-    description: 'Pick the default coding agent runtime.',
+    title: 'Choose your coding agent',
+    description:
+      'Pick the default coding agent runtime. The API notes below update for your choice. You can change this later in settings.',
     icon: faRobot,
     component: CodingAgentStep,
     isComplete: (): boolean => false,

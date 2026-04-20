@@ -14,12 +14,13 @@ interface Props {
   label?: string;
   options: CardSelectorOption[];
   selected?: string;
+  required?: boolean;
 }
 
-let { label, options, selected = $bindable('') }: Props = $props();
+let { label, options, selected = $bindable(''), required = false }: Props = $props();
 
 function handleClick(value: string): void {
-  selected = selected === value ? '' : value;
+  selected = !required && selected === value ? '' : value;
 }
 </script>
 
@@ -54,7 +55,7 @@ function handleClick(value: string): void {
           <div class="text-left min-w-0">
             <div class="text-sm font-medium text-[var(--pd-content-card-text)] truncate">{option.title}</div>
             {#if option.description}
-              <div class="text-[11px] text-[var(--pd-content-card-text)] opacity-60 mt-0.5 leading-relaxed line-clamp-2">{option.description}</div>
+              <div class="text-[11px] text-[var(--pd-content-card-text)] opacity-60 mt-0.5 leading-relaxed">{option.description}</div>
             {/if}
           </div>
         </div>
