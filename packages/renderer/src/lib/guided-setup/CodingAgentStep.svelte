@@ -131,7 +131,7 @@ $effect(() => {
         <div class="flex items-center gap-3 rounded-lg bg-(--pd-content-card-bg) p-4" role="status" aria-live="polite" data-testid="probe-checking">
           <Spinner size="1.25em" />
           <div>
-            <strong class="text-sm text-(--pd-content-card-text)">Checking local runtimes\u2026</strong>
+            <strong class="text-sm text-(--pd-content-card-text)">Checking local runtimes…</strong>
             <p class="text-xs text-(--pd-content-card-text) opacity-50 mt-0.5">Looking for Ollama or Ramalama on this machine.</p>
           </div>
         </div>
