@@ -219,6 +219,7 @@ import { INTERNAL_PROVIDER_ID, MCPRegistry } from './mcp/mcp-registry.js';
 import { MCPSchemaValidator } from './mcp/mcp-schema-validator.js';
 import { MessageBox } from './message-box.js';
 import { NavigationItemsInit } from './navigation-items-init.js';
+import { OnboardingInit } from './onboarding/onboarding-init.js';
 import { OnboardingRegistry } from './onboarding-registry.js';
 import { OpenDevToolsInit } from './open-devtools-init.js';
 import { ProviderRegistry } from './provider-registry.js';
@@ -713,6 +714,10 @@ export class PluginSystem {
     container.bind<AppearanceInit>(AppearanceInit).toSelf().inSingletonScope();
     const appearanceConfiguration = container.get<AppearanceInit>(AppearanceInit);
     appearanceConfiguration.init();
+
+    container.bind<OnboardingInit>(OnboardingInit).toSelf().inSingletonScope();
+    const onboardingInit = container.get<OnboardingInit>(OnboardingInit);
+    onboardingInit.init();
 
     container.bind<ConfirmationInit>(ConfirmationInit).toSelf().inSingletonScope();
     const confirmationConfiguration = container.get<ConfirmationInit>(ConfirmationInit);

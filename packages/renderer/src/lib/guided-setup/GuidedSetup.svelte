@@ -28,8 +28,15 @@ function getStepState(index: number): 'completed' | 'active' | 'upcoming' {
   return 'upcoming';
 }
 
+async function persistOnboardingDefaults(): Promise<void> {
+  await window.updateConfigurationValue('onboarding.defaultAgent', onboardingState.agent);
+}
+
 function advance(): void {
   if (!hasSteps || isLastStep) {
+    persistOnboardingDefaults().catch((err: unknown) => {
+      console.error('Failed to persist onboarding defaults', err);
+    });
     onclose();
   } else {
     currentStepIndex++;

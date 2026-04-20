@@ -76,6 +76,7 @@ const closeMock = vi.fn();
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
+  (window as unknown as Record<string, unknown>).updateConfigurationValue = vi.fn().mockResolvedValue(undefined);
 });
 
 test('renders stepper with all step labels', () => {
@@ -198,4 +199,32 @@ test('Skip button is not shown for non-skippable steps', async () => {
   await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
   expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+});
+
+test('persists default agent to settings.json when wizard completes', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+
+  expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
+});
+
+test('persists defaults when skipping to the end', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+  await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+
+  expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
+});
+
+test('does not persist defaults when advancing to intermediate steps', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+
+  expect(window.updateConfigurationValue).not.toHaveBeenCalled();
 });
