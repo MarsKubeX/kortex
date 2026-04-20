@@ -49,19 +49,19 @@ test('renders title and description', () => {
 test('has correct aria-label from title', () => {
   render(AgentTileCard, { agent: baseAgent, selected: false });
 
-  expect(screen.getByRole('option', { name: 'OpenCode' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'OpenCode' })).toBeInTheDocument();
 });
 
-test('shows aria-selected true when selected', () => {
+test('shows aria-checked true when selected', () => {
   render(AgentTileCard, { agent: baseAgent, selected: true });
 
-  expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByRole('radio')).toHaveAttribute('aria-checked', 'true');
 });
 
-test('shows aria-selected false when not selected', () => {
+test('shows aria-checked false when not selected', () => {
   render(AgentTileCard, { agent: baseAgent, selected: false });
 
-  expect(screen.getByRole('option')).toHaveAttribute('aria-selected', 'false');
+  expect(screen.getByRole('radio')).toHaveAttribute('aria-checked', 'false');
 });
 
 test('shows Recommended badge when agent is recommended', () => {
@@ -81,7 +81,7 @@ test('calls onclick when clicked', async () => {
   const clickHandler = vi.fn();
   render(AgentTileCard, { agent: baseAgent, selected: false, onclick: clickHandler });
 
-  await fireEvent.click(screen.getByRole('option'));
+  await fireEvent.click(screen.getByRole('radio'));
 
   expect(clickHandler).toHaveBeenCalledOnce();
 });
@@ -89,20 +89,20 @@ test('calls onclick when clicked', async () => {
 test('renders without onclick handler', () => {
   render(AgentTileCard, { agent: baseAgent, selected: false });
 
-  expect(screen.getByRole('option')).toBeInTheDocument();
+  expect(screen.getByRole('radio')).toBeInTheDocument();
 });
 
 test('applies selected border class when selected', () => {
   render(AgentTileCard, { agent: baseAgent, selected: true });
 
-  const tile = screen.getByRole('option');
+  const tile = screen.getByRole('radio');
   expect(tile.className).toContain('border-(--pd-content-card-border-selected)');
 });
 
 test('applies unselected border class when not selected', () => {
   render(AgentTileCard, { agent: baseAgent, selected: false });
 
-  const tile = screen.getByRole('option');
+  const tile = screen.getByRole('radio');
   expect(tile.className).toContain('border-(--pd-content-card-border)');
 });
 

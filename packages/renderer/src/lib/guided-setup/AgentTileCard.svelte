@@ -18,8 +18,8 @@ let { agent, selected, onclick }: Props = $props();
     {selected
       ? 'border-(--pd-content-card-border-selected) bg-(--pd-content-card-hover-inset-bg)'
       : 'border-(--pd-content-card-border) bg-(--pd-content-card-inset-bg) hover:bg-(--pd-content-card-hover-inset-bg)'}"
-  role="option"
-  aria-selected={selected}
+  role="radio"
+  aria-checked={selected}
   aria-label={agent.title}
   {onclick}>
   <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-3 {agent.iconBgClass}">

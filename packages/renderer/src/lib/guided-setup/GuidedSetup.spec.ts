@@ -76,7 +76,7 @@ const closeMock = vi.fn();
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
-  (window as unknown as Record<string, unknown>).updateConfigurationValue = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('updateConfigurationValue', vi.fn().mockResolvedValue(undefined));
 });
 
 test('renders stepper with all step labels', () => {
@@ -222,6 +222,25 @@ test('persists defaults when skipping to the end', async () => {
   await vi.advanceTimersByTimeAsync(0);
 
   expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
+});
+
+test('closes wizard even when persistence fails', async () => {
+  const persistError = new Error('write failed');
+  vi.stubGlobal('updateConfigurationValue', vi.fn().mockRejectedValue(persistError));
+  const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+  await vi.advanceTimersByTimeAsync(0);
+
+  expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to persist onboarding defaults', persistError);
+  expect(closeMock).toHaveBeenCalled();
+
+  consoleErrorSpy.mockRestore();
+  vi.stubGlobal('updateConfigurationValue', vi.fn().mockResolvedValue(undefined));
 });
 
 test('does not persist defaults when advancing to intermediate steps', async () => {

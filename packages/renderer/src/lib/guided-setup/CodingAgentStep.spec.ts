@@ -57,16 +57,16 @@ function renderStep(overrides: Partial<OnboardingState> = {}): void {
 test('renders all three agent tiles', () => {
   renderStep();
 
-  expect(screen.getByRole('option', { name: 'OpenCode' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'Claude Code' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'Claude Code + Vertex AI' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'OpenCode' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Claude Code' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' })).toBeInTheDocument();
 });
 
 test('OpenCode is selected by default', () => {
   renderStep();
 
-  const tile = screen.getByRole('option', { name: 'OpenCode' });
-  expect(tile).toHaveAttribute('aria-selected', 'true');
+  const tile = screen.getByRole('radio', { name: 'OpenCode' });
+  expect(tile).toHaveAttribute('aria-checked', 'true');
 });
 
 test('shows Recommended badge on OpenCode', () => {
@@ -78,18 +78,18 @@ test('shows Recommended badge on OpenCode', () => {
 test('clicking Claude Code selects it and hides OpenCode panel', async () => {
   renderStep();
 
-  const claudeTile = screen.getByRole('option', { name: 'Claude Code' });
+  const claudeTile = screen.getByRole('radio', { name: 'Claude Code' });
   await fireEvent.click(claudeTile);
 
-  expect(claudeTile).toHaveAttribute('aria-selected', 'true');
-  expect(screen.getByRole('option', { name: 'OpenCode' })).toHaveAttribute('aria-selected', 'false');
+  expect(claudeTile).toHaveAttribute('aria-checked', 'true');
+  expect(screen.getByRole('radio', { name: 'OpenCode' })).toHaveAttribute('aria-checked', 'false');
   expect(screen.queryByTestId('opencode-panel')).not.toBeInTheDocument();
 });
 
 test('clicking Claude Code sets onboarding agent to claude', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code' }));
 
   expect(onboarding.agent).toBe('claude');
   expect(onboarding.agentVariant).toBe('claude');
@@ -98,7 +98,7 @@ test('clicking Claude Code sets onboarding agent to claude', async () => {
 test('clicking Claude Code + Vertex AI sets agent to claude with vertex variant', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   expect(onboarding.agent).toBe('claude');
   expect(onboarding.agentVariant).toBe('claude-vertex');
@@ -172,16 +172,16 @@ test('step title and description are rendered', () => {
   expect(screen.getByText('Choose your coding agent')).toBeInTheDocument();
 });
 
-test('listbox has correct aria-label', () => {
+test('radiogroup has correct aria-label', () => {
   renderStep();
 
-  expect(screen.getByRole('listbox', { name: 'Coding agent' })).toBeInTheDocument();
+  expect(screen.getByRole('radiogroup', { name: 'Coding agent' })).toBeInTheDocument();
 });
 
 test('shows Claude API key panel when Claude Code is selected', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code' }));
 
   expect(screen.getByTestId('claude-panel')).toBeInTheDocument();
   expect(screen.getByTestId('anthropic-api-key-input')).toBeInTheDocument();
@@ -190,7 +190,7 @@ test('shows Claude API key panel when Claude Code is selected', async () => {
 test('Claude API key input updates onboarding state', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code' }));
 
   const input = screen.getByTestId('anthropic-api-key-input');
   await fireEvent.input(input, { target: { value: 'sk-ant-test123' } });
@@ -203,7 +203,7 @@ test('Claude API key input updates onboarding state', async () => {
 test('shows Vertex AI panel when Claude Code + Vertex AI is selected', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   expect(screen.getByTestId('vertex-panel')).toBeInTheDocument();
   expect(screen.getByTestId('vertex-use-vertex-input')).toBeInTheDocument();
@@ -216,7 +216,7 @@ test('shows Vertex AI panel when Claude Code + Vertex AI is selected', async () 
 test('Vertex AI inputs update onboarding state', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   const projectInput = screen.getByTestId('vertex-project-id-input');
   await fireEvent.input(projectInput, { target: { value: 'my-project' } });
@@ -233,7 +233,7 @@ test('Vertex AI inputs update onboarding state', async () => {
 test('Vertex region has default value', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   const regionInput: HTMLInputElement = screen.getByTestId('vertex-region-input');
   expect(regionInput.value).toBe('us-east5');
@@ -242,7 +242,7 @@ test('Vertex region has default value', async () => {
 test('CLAUDE_CODE_USE_VERTEX is read-only with value 1', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   const input: HTMLInputElement = screen.getByTestId('vertex-use-vertex-input');
   expect(input.value).toBe('1');
@@ -252,7 +252,7 @@ test('CLAUDE_CODE_USE_VERTEX is read-only with value 1', async () => {
 test('gcloud mount checkbox is checked by default', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   const checkbox: HTMLInputElement = screen.getByTestId('vertex-mount-gcloud');
   expect(checkbox.checked).toBe(true);
@@ -261,7 +261,7 @@ test('gcloud mount checkbox is checked by default', async () => {
 test('claude config mount checkbox is unchecked by default', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   const checkbox: HTMLInputElement = screen.getByTestId('vertex-mount-claude-config');
   expect(checkbox.checked).toBe(false);
@@ -270,7 +270,7 @@ test('claude config mount checkbox is unchecked by default', async () => {
 test('toggling mount checkboxes updates onboarding state', async () => {
   renderStep();
 
-  await fireEvent.click(screen.getByRole('option', { name: 'Claude Code + Vertex AI' }));
+  await fireEvent.click(screen.getByRole('radio', { name: 'Claude Code + Vertex AI' }));
 
   const gcloudCheckbox = screen.getByTestId('vertex-mount-gcloud');
   await fireEvent.click(gcloudCheckbox);

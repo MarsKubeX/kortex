@@ -115,7 +115,7 @@ $effect(() => {
     {description} The API notes below update for your choice. You can change this later in settings.
   </p>
 
-  <div class="grid grid-cols-3 gap-3 mb-8" role="listbox" aria-label="Coding agent">
+  <div class="grid grid-cols-3 gap-3 mb-8" role="radiogroup" aria-label="Coding agent">
     {#each agents as agent (agent.key)}
       <AgentTileCard
         {agent}
