@@ -32,11 +32,13 @@ async function persistOnboardingDefaults(): Promise<void> {
   await window.updateConfigurationValue('onboarding.defaultAgent', onboardingState.agent);
 }
 
-function advance(): void {
+async function advance(): Promise<void> {
   if (!hasSteps || isLastStep) {
-    persistOnboardingDefaults().catch((err: unknown) => {
+    try {
+      await persistOnboardingDefaults();
+    } catch (err: unknown) {
       console.error('Failed to persist onboarding defaults', err);
-    });
+    }
     onclose();
   } else {
     currentStepIndex++;
@@ -45,11 +47,15 @@ function advance(): void {
 
 function handleContinue(): void {
   completedSteps.add(currentStep.id);
-  advance();
+  advance().catch((err: unknown) => {
+    console.error('advance failed', err);
+  });
 }
 
 function handleSkip(): void {
-  advance();
+  advance().catch((err: unknown) => {
+    console.error('advance failed', err);
+  });
 }
 
 function handleStepClick(index: number): void {

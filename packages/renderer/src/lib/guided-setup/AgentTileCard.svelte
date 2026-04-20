@@ -13,6 +13,7 @@ let { agent, selected, onclick }: Props = $props();
 </script>
 
 <button
+  type="button"
   class="relative flex flex-col rounded-lg p-4 pb-10 text-left cursor-pointer transition-colors border-2
     {selected
       ? 'border-(--pd-content-card-border-selected) bg-(--pd-content-card-hover-inset-bg)'

@@ -22,9 +22,12 @@ import type { Component } from 'svelte';
 
 import CodingAgentStep from './CodingAgentStep.svelte';
 
+export type CliAgent = 'opencode' | 'claude';
+export type AgentVariant = 'opencode' | 'claude' | 'claude-vertex';
+
 export interface AgentTileData {
-  key: string;
-  cliAgent: string;
+  key: AgentVariant;
+  cliAgent: CliAgent;
   title: string;
   description: string;
   icon: IconDefinition;
@@ -33,8 +36,8 @@ export interface AgentTileData {
 }
 
 export interface OnboardingState {
-  agent: string;
-  agentVariant: string;
+  agent: CliAgent;
+  agentVariant: AgentVariant;
   model: string;
   anthropicApiKey: string;
   vertexProjectId: string;

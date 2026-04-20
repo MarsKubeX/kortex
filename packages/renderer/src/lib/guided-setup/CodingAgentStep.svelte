@@ -66,12 +66,6 @@ $effect(() => {
 
 function selectAgent(agent: AgentTileData): void {
   selectedVariant = agent.key;
-
-  if (agent.key === 'opencode' && probeStatus === 'idle') {
-    probeLocalRuntime().catch((err: unknown) => {
-      console.error('Local runtime probe failed', err);
-    });
-  }
 }
 
 async function probeOllama(): Promise<boolean> {
@@ -189,7 +183,8 @@ $effect(() => {
           placeholder="sk-ant-..."
           bind:value={anthropicApiKey}
           data-testid="anthropic-api-key-input"
-          autocomplete="off" />
+          autocomplete="off"
+          spellcheck="false" />
       </label>
     </div>
   {:else if selectedVariant === 'claude-vertex'}

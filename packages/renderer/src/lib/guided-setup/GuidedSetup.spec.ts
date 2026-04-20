@@ -159,6 +159,7 @@ test('dispatches close event when finishing on last step', async () => {
 
   const dashboardButton = screen.getByRole('button', { name: /Go to Dashboard/ });
   await fireEvent.click(dashboardButton);
+  await vi.advanceTimersByTimeAsync(0);
 
   expect(closeMock).toHaveBeenCalled();
 });
@@ -207,6 +208,7 @@ test('persists default agent to settings.json when wizard completes', async () =
   await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
   await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
   await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+  await vi.advanceTimersByTimeAsync(0);
 
   expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
 });
@@ -217,6 +219,7 @@ test('persists defaults when skipping to the end', async () => {
   await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
   await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
   await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+  await vi.advanceTimersByTimeAsync(0);
 
   expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
 });
