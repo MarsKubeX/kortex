@@ -1,13 +1,11 @@
 <script lang="ts">
-import { faClaude } from '@fortawesome/free-brands-svg-icons';
-import { faCircleCheck, faCloud, faDesktop, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
-import { Button, Checkbox, Link, Spinner } from '@podman-desktop/ui-svelte';
+import { faCircleCheck, faDesktop, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { Button, Link, Spinner } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 import { untrack } from 'svelte';
 
 import type { CardSelectorOption } from '/@/lib/ui/CardSelector.svelte';
 import CardSelector from '/@/lib/ui/CardSelector.svelte';
-import PasswordInput from '/@/lib/ui/PasswordInput.svelte';
 
 import type { AgentVariant, CliAgent, GuidedSetupStepProps } from './guided-setup-steps';
 
@@ -28,28 +26,9 @@ const agentOptions: CardSelectorOption[] = [
       'Open-source agent on your machine \u2014 local models via Ollama or Ramalama, or cloud APIs (OpenAI, Gemini, and other providers OpenCode supports).',
     icon: faDesktop,
   },
-  {
-    value: 'claude',
-    title: 'Claude Code',
-    badge: 'Anthropic',
-    description: 'Anthropic Claude in the terminal \u2014 uses the Anthropic API or your org bridge.',
-    icon: faClaude,
-  },
-  {
-    value: 'claude-vertex',
-    title: 'Claude Code + Vertex AI',
-    badge: 'Vertex AI',
-    description: 'Claude Code with models served on Google Cloud Vertex AI instead of the Anthropic API.',
-    icon: faCloud,
-  },
 ];
 
 let selectedVariant = $state(untrack(() => onboarding.agentVariant));
-let anthropicApiKey = $state(untrack(() => onboarding.anthropicApiKey));
-let vertexProjectId = $state(untrack(() => onboarding.vertexProjectId));
-let vertexRegion = $state(untrack(() => onboarding.vertexRegion));
-let vertexMountGcloud = $state(untrack(() => onboarding.vertexMountGcloud));
-let vertexMountClaudeConfig = $state(untrack(() => onboarding.vertexMountClaudeConfig));
 
 type ProbeStatus = 'idle' | 'checking' | 'detected' | 'not-found';
 let probeStatus: ProbeStatus = $state('idle');
@@ -60,11 +39,6 @@ $effect(() => {
     onboarding.agent = cliAgent;
     onboarding.agentVariant = selectedVariant as AgentVariant;
   }
-  onboarding.anthropicApiKey = anthropicApiKey;
-  onboarding.vertexProjectId = vertexProjectId;
-  onboarding.vertexRegion = vertexRegion;
-  onboarding.vertexMountGcloud = vertexMountGcloud;
-  onboarding.vertexMountClaudeConfig = vertexMountClaudeConfig;
 });
 
 async function probeOllama(): Promise<boolean> {
@@ -161,92 +135,6 @@ $effect(() => {
           </div>
         </div>
       {/if}
-    </div>
-  {:else if selectedVariant === 'claude'}
-    <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6" data-testid="claude-panel">
-      <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-        API &amp; Credentials
-      </h3>
-      <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-4 leading-relaxed">
-        Claude Code uses the <strong>Anthropic API</strong> unless your team routes traffic elsewhere.
-        Optionally store a key now (encrypted as <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">ANTHROPIC_API_KEY</code>).
-      </p>
-      <div>
-        <span class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50">API key (optional)</span>
-        <PasswordInput
-          id="anthropic-api-key"
-          placeholder="sk-ant-..."
-          bind:password={anthropicApiKey} />
-      </div>
-    </div>
-  {:else if selectedVariant === 'claude-vertex'}
-    <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6" data-testid="vertex-panel">
-      <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-        Vertex AI &amp; <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">agents.json</code>
-      </h3>
-      <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-4 leading-relaxed">
-        These values map to <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">environment</code> entries for the Claude agent in
-        <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.kdn/config/agents.json</code>.
-        Run <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">gcloud auth application-default login</code> on the host before starting the workspace.
-      </p>
-      <div class="flex flex-col gap-4">
-        <label class="block">
-          <span class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50">CLAUDE_CODE_USE_VERTEX</span>
-          <input
-            type="text"
-            class="mt-1 w-full rounded-lg border border-(--pd-content-divider) bg-(--pd-content-card-bg) px-3 py-2 text-sm text-(--pd-content-card-text) opacity-60"
-            value="1"
-            readonly
-            data-testid="vertex-use-vertex-input" />
-        </label>
-        <label class="block">
-          <span class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50">ANTHROPIC_VERTEX_PROJECT_ID</span>
-          <input
-            type="text"
-            class="mt-1 w-full rounded-lg border border-(--pd-content-divider) bg-(--pd-content-card-bg) px-3 py-2 text-sm text-(--pd-content-card-text) placeholder:opacity-40 focus:outline-none focus:border-(--pd-content-card-border-selected)"
-            placeholder="my-gcp-project-id"
-            bind:value={vertexProjectId}
-            data-testid="vertex-project-id-input"
-            autocomplete="off" />
-        </label>
-        <label class="block">
-          <span class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50">CLOUD_ML_REGION</span>
-          <input
-            type="text"
-            class="mt-1 w-full rounded-lg border border-(--pd-content-divider) bg-(--pd-content-card-bg) px-3 py-2 text-sm text-(--pd-content-card-text) placeholder:opacity-40 focus:outline-none focus:border-(--pd-content-card-border-selected)"
-            placeholder="us-east5"
-            bind:value={vertexRegion}
-            data-testid="vertex-region-input"
-            autocomplete="off" />
-        </label>
-      </div>
-
-      <div class="mt-5">
-        <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-3">
-          Mounts (add under <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">claude.mounts</code> in the same file):
-        </p>
-        <div class="flex flex-col gap-2">
-          <Checkbox
-            title="Mount gcloud credentials"
-            bind:checked={vertexMountGcloud}>
-            <span class="text-xs text-(--pd-content-card-text)">
-              Mount <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">$HOME/.config/gcloud</code> read-only for application default credentials
-            </span>
-          </Checkbox>
-          <Checkbox
-            title="Mount Claude config"
-            bind:checked={vertexMountClaudeConfig}>
-            <span class="text-xs text-(--pd-content-card-text)">
-              Also mount <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.claude</code> and
-              <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">~/.claude.json</code> (optional; reuse host Claude Code settings)
-            </span>
-          </Checkbox>
-        </div>
-      </div>
-
-      <p class="text-xs text-(--pd-content-card-text) opacity-40 mt-4 leading-relaxed">
-        No <code class="text-xs bg-(--pd-content-card-bg) px-1.5 py-0.5 rounded">ANTHROPIC_API_KEY</code> is required when using Vertex — credentials come from the mounted gcloud config.
-      </p>
     </div>
   {/if}
 </div>

@@ -54,12 +54,10 @@ function renderStep(overrides: Partial<OnboardingState> = {}): void {
   });
 }
 
-test('renders all agent tiles', () => {
+test('renders the OpenCode agent tile', () => {
   renderStep();
 
   expect(screen.getByRole('button', { name: 'OpenCode' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Claude Code' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Claude Code + Vertex AI' })).toBeInTheDocument();
 });
 
 test('OpenCode is selected by default', () => {
@@ -73,37 +71,6 @@ test('shows Recommended badge on OpenCode', () => {
   renderStep();
 
   expect(screen.getByText('Recommended')).toBeInTheDocument();
-});
-
-test('clicking Claude Code selects it and hides OpenCode panel', async () => {
-  renderStep();
-
-  const claudeTile = screen.getByRole('button', { name: 'Claude Code' });
-  await fireEvent.click(claudeTile);
-
-  expect(claudeTile.className).toContain('border-[var(--pd-content-card-border-selected)]');
-  expect(screen.getByRole('button', { name: 'OpenCode' }).className).toContain(
-    'border-[var(--pd-content-card-border)]',
-  );
-  expect(screen.queryByTestId('opencode-panel')).not.toBeInTheDocument();
-});
-
-test('clicking Claude Code sets onboarding agent to claude', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
-
-  expect(onboarding.agent).toBe('claude');
-  expect(onboarding.agentVariant).toBe('claude');
-});
-
-test('clicking Claude Code + Vertex AI sets agent to claude with vertex variant', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  expect(onboarding.agent).toBe('claude');
-  expect(onboarding.agentVariant).toBe('claude-vertex');
 });
 
 test('shows local runtime panel when OpenCode is selected', () => {
@@ -179,110 +146,4 @@ test('card selector region has correct aria-label', () => {
   renderStep();
 
   expect(screen.getByRole('region', { name: 'Coding agent' })).toBeInTheDocument();
-});
-
-test('shows Claude API key panel when Claude Code is selected', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
-
-  expect(screen.getByTestId('claude-panel')).toBeInTheDocument();
-  expect(screen.getByLabelText('password anthropic-api-key')).toBeInTheDocument();
-});
-
-test('Claude API key input updates onboarding state', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
-
-  const input = screen.getByLabelText('password anthropic-api-key');
-  await fireEvent.input(input, { target: { value: 'sk-ant-test123' } });
-
-  await waitFor(() => {
-    expect(onboarding.anthropicApiKey).toBe('sk-ant-test123');
-  });
-});
-
-test('shows Vertex AI panel when Claude Code + Vertex AI is selected', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  expect(screen.getByTestId('vertex-panel')).toBeInTheDocument();
-  expect(screen.getByTestId('vertex-use-vertex-input')).toBeInTheDocument();
-  expect(screen.getByTestId('vertex-project-id-input')).toBeInTheDocument();
-  expect(screen.getByTestId('vertex-region-input')).toBeInTheDocument();
-  expect(screen.getByRole('checkbox', { name: 'Mount gcloud credentials' })).toBeInTheDocument();
-  expect(screen.getByRole('checkbox', { name: 'Mount Claude config' })).toBeInTheDocument();
-});
-
-test('Vertex AI inputs update onboarding state', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  const projectInput = screen.getByTestId('vertex-project-id-input');
-  await fireEvent.input(projectInput, { target: { value: 'my-project' } });
-
-  const regionInput = screen.getByTestId('vertex-region-input');
-  await fireEvent.input(regionInput, { target: { value: 'europe-west4' } });
-
-  await waitFor(() => {
-    expect(onboarding.vertexProjectId).toBe('my-project');
-    expect(onboarding.vertexRegion).toBe('europe-west4');
-  });
-});
-
-test('Vertex region has default value', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  const regionInput: HTMLInputElement = screen.getByTestId('vertex-region-input');
-  expect(regionInput.value).toBe('us-east5');
-});
-
-test('CLAUDE_CODE_USE_VERTEX is read-only with value 1', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  const input: HTMLInputElement = screen.getByTestId('vertex-use-vertex-input');
-  expect(input.value).toBe('1');
-  expect(input).toHaveAttribute('readonly');
-});
-
-test('gcloud mount checkbox is checked by default', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  const checkbox: HTMLInputElement = screen.getByRole('checkbox', { name: 'Mount gcloud credentials' });
-  expect(checkbox.checked).toBe(true);
-});
-
-test('claude config mount checkbox is unchecked by default', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  const checkbox: HTMLInputElement = screen.getByRole('checkbox', { name: 'Mount Claude config' });
-  expect(checkbox.checked).toBe(false);
-});
-
-test('toggling mount checkboxes updates onboarding state', async () => {
-  renderStep();
-
-  await fireEvent.click(screen.getByRole('button', { name: 'Claude Code + Vertex AI' }));
-
-  const gcloudCheckbox = screen.getByRole('checkbox', { name: 'Mount gcloud credentials' });
-  await fireEvent.click(gcloudCheckbox);
-
-  const claudeConfigCheckbox = screen.getByRole('checkbox', { name: 'Mount Claude config' });
-  await fireEvent.click(claudeConfigCheckbox);
-
-  await waitFor(() => {
-    expect(onboarding.vertexMountGcloud).toBe(false);
-    expect(onboarding.vertexMountClaudeConfig).toBe(true);
-  });
 });
