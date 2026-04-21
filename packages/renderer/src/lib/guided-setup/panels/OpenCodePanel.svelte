@@ -34,6 +34,14 @@ async function probeLocalRuntime(): Promise<void> {
   probeStatus = ollama || ramalama ? 'detected' : 'not-found';
 }
 
+function openOllamaLink(): void {
+  window.openExternal('https://ollama.com').catch(() => {});
+}
+
+function openRamalamaLink(): void {
+  window.openExternal('https://github.com/containers/ramalama').catch(() => {});
+}
+
 function handleRetryProbe(): void {
   probeLocalRuntime().catch((err: unknown) => {
     console.error('Local runtime probe failed', err);
@@ -80,9 +88,9 @@ $effect(() => {
         <strong class="text-sm text-amber-300">No local model server detected</strong>
         <p class="text-xs text-amber-300/70 mt-1 leading-relaxed">
           Install and start
-          <Link on:click={(): Promise<void> => window.openExternal('https://ollama.com')}>Ollama</Link>
+          <Link on:click={openOllamaLink}>Ollama</Link>
           or
-          <Link on:click={(): Promise<void> => window.openExternal('https://github.com/containers/ramalama')}>Ramalama</Link>,
+          <Link on:click={openRamalamaLink}>Ramalama</Link>,
           pull at least one model, then run <strong>Check again</strong>.
         </p>
         <Button type="secondary" class="mt-3" aria-label="Check again" onclick={handleRetryProbe}>Check again</Button>
