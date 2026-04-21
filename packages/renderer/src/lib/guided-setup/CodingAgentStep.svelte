@@ -81,7 +81,9 @@ async function probeOllama(): Promise<boolean> {
 async function probeRamalama(): Promise<boolean> {
   try {
     const providers = await window.getProviderInfos();
-    return providers.some(p => p.id === 'ramalama' && p.inferenceConnections.length > 0);
+    return providers.some(
+      p => p.id === 'ramalama' && p.inferenceConnections.some(connection => connection.status === 'started'),
+    );
   } catch {
     return false;
   }
