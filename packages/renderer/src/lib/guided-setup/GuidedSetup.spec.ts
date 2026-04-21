@@ -60,7 +60,6 @@ vi.mock(import('./guided-setup-steps'), async importOriginal => {
     ] satisfies GuidedSetupStep[],
     createDefaultOnboardingState: (): OnboardingState => ({
       agent: 'opencode',
-      agentVariant: 'opencode',
       model: '',
     }),
   };

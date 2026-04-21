@@ -41,6 +41,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   onboarding = createDefaultOnboardingState();
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no server')));
+  vi.stubGlobal('listCliAgents', vi.fn().mockResolvedValue(['opencode']));
   stubRamalama(false);
 });
 
@@ -146,4 +147,14 @@ test('card selector region has correct aria-label', () => {
   renderStep();
 
   expect(screen.getByRole('region', { name: 'Coding agent' })).toBeInTheDocument();
+});
+
+test('falls back to all registry entries when listCliAgents fails', async () => {
+  vi.stubGlobal('listCliAgents', vi.fn().mockRejectedValue(new Error('kdn not found')));
+
+  renderStep();
+
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'OpenCode' })).toBeInTheDocument();
+  });
 });

@@ -130,6 +130,21 @@ export class AgentWorkspaceManager implements Disposable {
     }
   }
 
+  async listCliAgents(): Promise<string[]> {
+    const cliPath = this.getCliPath();
+    const args = ['info', '--output', 'json'];
+    console.log(`Executing: ${cliPath} ${args.join(' ')}`);
+    try {
+      const result = await this.exec.exec(cliPath, args);
+      const info = JSON.parse(result.stdout) as { version: string; agents: string[]; runtimes: string[] };
+      return info.agents;
+    } catch (err: unknown) {
+      const detail = this.extractCliError(err);
+      console.error(`kdn failed: ${cliPath} ${args.join(' ')} — ${detail}`);
+      throw new Error(detail);
+    }
+  }
+
   async list(): Promise<AgentWorkspaceSummary[]> {
     const response = await this.execKdn<{ items: AgentWorkspaceSummary[] }>(['list']);
     return response.items;
@@ -171,6 +186,10 @@ export class AgentWorkspaceManager implements Disposable {
   }
 
   init(): void {
+    this.ipcHandle('cli-info:listAgents', async (): Promise<string[]> => {
+      return this.listCliAgents();
+    });
+
     this.ipcHandle(
       'agent-workspace:create',
       async (_listener: unknown, options: AgentWorkspaceCreateOptions): Promise<AgentWorkspaceId> => {

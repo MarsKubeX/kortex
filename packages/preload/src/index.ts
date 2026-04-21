@@ -318,6 +318,11 @@ export function initExposure(): void {
     return ipcInvoke('container-provider-registry:listPods');
   });
 
+  // CLI Info
+  contextBridge.exposeInMainWorld('listCliAgents', async (): Promise<string[]> => {
+    return ipcInvoke('cli-info:listAgents');
+  });
+
   // Agent Workspaces
   contextBridge.exposeInMainWorld(
     'createAgentWorkspace',

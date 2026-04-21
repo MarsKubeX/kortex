@@ -141,6 +141,10 @@ describe('init', () => {
   test('registers IPC handler for stop', () => {
     expect(ipcHandle).toHaveBeenCalledWith('agent-workspace:stop', expect.any(Function));
   });
+
+  test('registers IPC handler for listAgents', () => {
+    expect(ipcHandle).toHaveBeenCalledWith('cli-info:listAgents', expect.any(Function));
+  });
 });
 
 describe('getCliPath', () => {
@@ -270,6 +274,28 @@ describe('create', () => {
     await expect(manager.create({ ...defaultOptions, sourcePath: '/tmp/not-found' })).rejects.toThrow(
       'sources directory does not exist: /tmp/not-found',
     );
+  });
+});
+
+describe('listCliAgents', () => {
+  test('executes kdn info and returns agent names', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockResolvedValue(
+      mockExecResult(JSON.stringify({ version: '0.1.0', agents: ['claude', 'opencode'], runtimes: ['podman'] })),
+    );
+
+    const result = await manager.listCliAgents();
+
+    expect(exec.exec).toHaveBeenCalledWith(KAIDEN_CLI_PATH, ['info', '--output', 'json']);
+    expect(result).toEqual(['claude', 'opencode']);
+  });
+
+  test('rejects when CLI fails', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockRejectedValue(new Error('command not found'));
+
+    await expect(manager.listCliAgents()).rejects.toThrow('command not found');
   });
 });
 

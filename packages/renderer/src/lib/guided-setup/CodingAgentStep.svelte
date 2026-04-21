@@ -1,85 +1,47 @@
 <script lang="ts">
-import { faCircleCheck, faDesktop, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
-import { Button, Link, Spinner } from '@podman-desktop/ui-svelte';
-import { Icon } from '@podman-desktop/ui-svelte/icons';
-import { untrack } from 'svelte';
+import { onMount, untrack } from 'svelte';
 
 import type { CardSelectorOption } from '/@/lib/ui/CardSelector.svelte';
 import CardSelector from '/@/lib/ui/CardSelector.svelte';
 
-import type { AgentVariant, CliAgent, GuidedSetupStepProps } from './guided-setup-steps';
+import { type AgentDefinition, agentDefinitions } from './agent-registry';
+import type { CliAgent, GuidedSetupStepProps } from './guided-setup-steps';
 
 let { title, description, onboarding }: GuidedSetupStepProps = $props();
 
-const variantToCliAgent: Record<AgentVariant, CliAgent> = {
-  opencode: 'opencode',
-  claude: 'claude',
-  'claude-vertex': 'claude',
-};
+let cliAgents: string[] | undefined = $state();
 
-const agentOptions: CardSelectorOption[] = [
-  {
-    value: 'opencode',
-    title: 'OpenCode',
-    badge: 'Recommended',
-    description:
-      'Open-source agent on your machine \u2014 local models via Ollama or Ramalama, or cloud APIs (OpenAI, Gemini, and other providers OpenCode supports).',
-    icon: faDesktop,
-  },
-];
-
-let selectedVariant = $state(untrack(() => onboarding.agentVariant));
-
-type ProbeStatus = 'idle' | 'checking' | 'detected' | 'not-found';
-let probeStatus: ProbeStatus = $state('idle');
-
-$effect(() => {
-  const cliAgent = variantToCliAgent[selectedVariant as AgentVariant];
-  if (cliAgent) {
-    onboarding.agent = cliAgent;
-    onboarding.agentVariant = selectedVariant as AgentVariant;
+onMount(async () => {
+  try {
+    cliAgents = await window.listCliAgents();
+  } catch (err) {
+    console.warn('Failed to fetch CLI agents, showing all registry entries', err);
+    cliAgents = agentDefinitions.map(d => d.cliName);
   }
 });
 
-async function probeOllama(): Promise<boolean> {
-  try {
-    const response = await fetch('http://127.0.0.1:11434/api/tags', {
-      signal: AbortSignal.timeout(4000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+let filteredDefinitions = $derived(
+  cliAgents ? agentDefinitions.filter(d => cliAgents!.includes(d.cliName)) : agentDefinitions,
+);
 
-async function probeRamalama(): Promise<boolean> {
-  try {
-    const providers = await window.getProviderInfos();
-    return providers.some(
-      p => p.id === 'ramalama' && p.inferenceConnections.some(connection => connection.status === 'started'),
-    );
-  } catch {
-    return false;
-  }
-}
+const definitionsByAgent = $derived(new Map<string, AgentDefinition>(filteredDefinitions.map(d => [d.cliName, d])));
 
-async function probeLocalRuntime(): Promise<void> {
-  probeStatus = 'checking';
-  const [ollama, ramalama] = await Promise.all([probeOllama(), probeRamalama()]);
-  probeStatus = ollama || ramalama ? 'detected' : 'not-found';
-}
+const agentOptions: CardSelectorOption[] = $derived(
+  filteredDefinitions.map(d => ({
+    value: d.cliName,
+    title: d.title,
+    badge: d.badge,
+    description: d.description,
+    icon: d.icon,
+  })),
+);
 
-function handleRetryProbe(): void {
-  probeLocalRuntime().catch((err: unknown) => {
-    console.error('Local runtime probe failed', err);
-  });
-}
+let selectedAgent = $state(untrack(() => onboarding.agent));
+let activeDefinition: AgentDefinition | undefined = $derived(definitionsByAgent.get(selectedAgent));
 
 $effect(() => {
-  if (selectedVariant === 'opencode' && probeStatus === 'idle') {
-    probeLocalRuntime().catch((err: unknown) => {
-      console.error('Local runtime probe failed', err);
-    });
+  if (definitionsByAgent.has(selectedAgent)) {
+    onboarding.agent = selectedAgent as CliAgent;
   }
 });
 </script>
@@ -91,50 +53,10 @@ $effect(() => {
   </p>
 
   <div class="mb-8">
-    <CardSelector label="Coding agent" options={agentOptions} bind:selected={selectedVariant} required />
+    <CardSelector label="Coding agent" options={agentOptions} bind:selected={selectedAgent} required />
   </div>
 
-  {#if selectedVariant === 'opencode'}
-    <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6" data-testid="opencode-panel">
-      <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-        Local Runtime
-      </h3>
-      <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-4 leading-relaxed">
-        We probe for a local OpenAI-compatible server (typically <strong>Ollama</strong> on port 11434 or <strong>Ramalama</strong>). Results update the default-model step.
-      </p>
-
-      {#if probeStatus === 'checking'}
-        <div class="flex items-center gap-3 rounded-lg bg-(--pd-content-card-bg) p-4" role="status" aria-live="polite" data-testid="probe-checking">
-          <Spinner size="1.25em" />
-          <div>
-            <strong class="text-sm text-(--pd-content-card-text)">Checking local runtimes…</strong>
-            <p class="text-xs text-(--pd-content-card-text) opacity-50 mt-0.5">Looking for Ollama or Ramalama on this machine.</p>
-          </div>
-        </div>
-      {:else if probeStatus === 'detected'}
-        <div class="flex items-center gap-3 rounded-lg bg-green-900/20 border border-green-700/30 p-4" role="status" aria-live="polite" data-testid="probe-detected">
-          <Icon icon={faCircleCheck} size="lg" class="text-green-400" />
-          <div>
-            <strong class="text-sm text-green-300">Local runtime detected</strong>
-            <p class="text-xs text-green-300/70 mt-0.5">You can pick a default from the local catalog on the next step.</p>
-          </div>
-        </div>
-      {:else if probeStatus === 'not-found'}
-        <div class="flex items-start gap-3 rounded-lg bg-amber-900/20 border border-amber-700/30 p-4" role="alert" data-testid="probe-not-found">
-          <Icon icon={faTriangleExclamation} size="lg" class="text-amber-400 shrink-0 mt-0.5" />
-          <div>
-            <strong class="text-sm text-amber-300">No local model server detected</strong>
-            <p class="text-xs text-amber-300/70 mt-1 leading-relaxed">
-              Install and start
-              <Link on:click={(): Promise<void> => window.openExternal('https://ollama.com')}>Ollama</Link>
-              or
-              <Link on:click={(): Promise<void> => window.openExternal('https://github.com/containers/ramalama')}>Ramalama</Link>,
-              pull at least one model, then run <strong>Check again</strong>.
-            </p>
-            <Button type="secondary" class="mt-3" aria-label="Check again" onclick={handleRetryProbe}>Check again</Button>
-          </div>
-        </div>
-      {/if}
-    </div>
+  {#if activeDefinition?.panel}
+    <activeDefinition.panel />
   {/if}
 </div>
