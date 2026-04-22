@@ -153,6 +153,10 @@ describe('init', () => {
   test('registers IPC handler for stop', () => {
     expect(ipcHandle).toHaveBeenCalledWith('agent-workspace:stop', expect.any(Function));
   });
+
+  test('registers IPC handler for getCliInfo', () => {
+    expect(ipcHandle).toHaveBeenCalledWith('cli-info:get', expect.any(Function));
+  });
 });
 
 describe('watchInstancesFile', () => {
@@ -194,6 +198,59 @@ describe('getCliPath', () => {
     await manager.list();
 
     expect(exec.exec).toHaveBeenCalledWith('kdn', ['workspace', 'list', '--output', 'json'], undefined);
+  });
+});
+
+describe('getCliInfo', () => {
+  test('executes kdn info and returns agents, runtimes, and version', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockResolvedValue(
+      mockExecResult(JSON.stringify({ version: '0.1.0', agents: ['claude', 'opencode'], runtimes: ['podman'] })),
+    );
+
+    const result = await manager.getCliInfo();
+
+    expect(exec.exec).toHaveBeenCalledWith(KAIDEN_CLI_PATH, ['info', '--output', 'json']);
+    expect(result).toEqual({ version: '0.1.0', agents: ['claude', 'opencode'], runtimes: ['podman'] });
+  });
+
+  test('returns empty arrays when CLI returns response without agents or runtimes', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockResolvedValue(mockExecResult(JSON.stringify({ version: '0.1.0' })));
+
+    const result = await manager.getCliInfo();
+
+    expect(result).toEqual({ version: '0.1.0', agents: [], runtimes: [] });
+  });
+
+  test('returns defaults when CLI returns non-object response', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockResolvedValue(mockExecResult('"unexpected string"'));
+
+    const result = await manager.getCliInfo();
+
+    expect(result).toEqual({ version: '', agents: [], runtimes: [] });
+  });
+
+  test('rejects when CLI fails', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockRejectedValue(new Error('command not found'));
+
+    await expect(manager.getCliInfo()).rejects.toThrow('command not found');
+  });
+
+  test('extracts kdn JSON error from stdout on failure', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const runError = mockRunError({
+      stdout: JSON.stringify({ error: 'failed to read --storage flag' }),
+    });
+    vi.spyOn(exec, 'exec').mockRejectedValue(runError);
+
+    await expect(manager.getCliInfo()).rejects.toThrow('failed to read --storage flag');
   });
 });
 

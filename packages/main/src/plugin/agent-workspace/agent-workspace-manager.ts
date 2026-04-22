@@ -33,6 +33,7 @@ import type {
   AgentWorkspaceCreateOptions,
   AgentWorkspaceId,
   AgentWorkspaceSummary,
+  CliInfo,
 } from '/@api/agent-workspace-info.js';
 import { ApiSenderType } from '/@api/api-sender/api-sender-type.js';
 
@@ -100,6 +101,33 @@ export class AgentWorkspaceManager implements Disposable {
     } catch (err: unknown) {
       const detail = this.extractCliError(err);
       console.error(`kdn failed: ${cliPath} ${fullArgs.join(' ')} — ${detail}`);
+      throw new Error(detail);
+    }
+  }
+
+  async getCliInfo(): Promise<CliInfo> {
+    const cliPath = this.getCliPath();
+    const args = ['info', '--output', 'json'];
+    console.log(`Executing: ${cliPath} ${args.join(' ')}`);
+    try {
+      const result = await this.exec.exec(cliPath, args);
+      const info: unknown = JSON.parse(result.stdout);
+      if (typeof info !== 'object' || info === null) {
+        console.warn('kdn info returned non-object, falling back to defaults', result.stdout);
+        return { version: '', agents: [], runtimes: [] };
+      }
+      const record = info as Record<string, unknown>;
+      const version = record['version'];
+      const agents = record['agents'];
+      const runtimes = record['runtimes'];
+      return {
+        version: typeof version === 'string' ? version : '',
+        agents: Array.isArray(agents) && agents.every(a => typeof a === 'string') ? (agents as string[]) : [],
+        runtimes: Array.isArray(runtimes) && runtimes.every(r => typeof r === 'string') ? (runtimes as string[]) : [],
+      };
+    } catch (err: unknown) {
+      const detail = this.extractCliError(err);
+      console.error(`kdn failed: ${cliPath} ${args.join(' ')} — ${detail}`);
       throw new Error(detail);
     }
   }
@@ -177,6 +205,10 @@ export class AgentWorkspaceManager implements Disposable {
   }
 
   init(): void {
+    this.ipcHandle('cli-info:get', async (): Promise<CliInfo> => {
+      return this.getCliInfo();
+    });
+
     this.ipcHandle(
       'agent-workspace:create',
       async (_listener: unknown, options: AgentWorkspaceCreateOptions): Promise<AgentWorkspaceId> => {
