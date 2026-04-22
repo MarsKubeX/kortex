@@ -321,7 +321,7 @@ export function initExposure(): void {
 
   // CLI Info
   contextBridge.exposeInMainWorld('getCliInfo', async (): Promise<CliInfo> => {
-    return ipcInvoke('cli-info:get');
+    return ipcInvoke('agent-workspace:getCliInfo');
   });
 
   // Agent Workspaces

@@ -197,7 +197,7 @@ export class AgentWorkspaceManager implements Disposable {
   }
 
   init(): void {
-    this.ipcHandle('cli-info:get', async (): Promise<CliInfo> => {
+    this.ipcHandle('agent-workspace:getCliInfo', async (): Promise<CliInfo> => {
       return this.getCliInfo();
     });
 

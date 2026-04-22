@@ -155,7 +155,7 @@ describe('init', () => {
   });
 
   test('registers IPC handler for getCliInfo', () => {
-    expect(ipcHandle).toHaveBeenCalledWith('cli-info:get', expect.any(Function));
+    expect(ipcHandle).toHaveBeenCalledWith('agent-workspace:getCliInfo', expect.any(Function));
   });
 });
 
