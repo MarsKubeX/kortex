@@ -290,6 +290,20 @@ describe('listCliAgents', () => {
     expect(result).toEqual(['claude', 'opencode']);
   });
 
+  test('returns empty array when CLI returns unexpected shape', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(exec, 'exec').mockResolvedValue(mockExecResult(JSON.stringify({ version: '0.1.0' })));
+
+    const result = await manager.listCliAgents();
+
+    expect(result).toEqual([]);
+    expect(console.warn).toHaveBeenCalledWith(
+      'kdn info returned unexpected shape, falling back to empty agent list',
+      expect.any(String),
+    );
+  });
+
   test('rejects when CLI fails', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

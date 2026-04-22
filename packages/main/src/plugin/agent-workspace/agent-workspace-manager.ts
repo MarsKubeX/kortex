@@ -136,8 +136,18 @@ export class AgentWorkspaceManager implements Disposable {
     console.log(`Executing: ${cliPath} ${args.join(' ')}`);
     try {
       const result = await this.exec.exec(cliPath, args);
-      const info = JSON.parse(result.stdout) as { version: string; agents: string[]; runtimes: string[] };
-      return info.agents;
+      const info: unknown = JSON.parse(result.stdout);
+      if (
+        typeof info === 'object' &&
+        info !== null &&
+        'agents' in info &&
+        Array.isArray((info as { agents: unknown }).agents) &&
+        (info as { agents: unknown[] }).agents.every(a => typeof a === 'string')
+      ) {
+        return (info as { agents: string[] }).agents;
+      }
+      console.warn('kdn info returned unexpected shape, falling back to empty agent list', result.stdout);
+      return [];
     } catch (err: unknown) {
       const detail = this.extractCliError(err);
       console.error(`kdn failed: ${cliPath} ${args.join(' ')} — ${detail}`);

@@ -42,6 +42,8 @@ let activeDefinition: AgentDefinition | undefined = $derived(definitionsByAgent.
 $effect(() => {
   if (definitionsByAgent.has(selectedAgent)) {
     onboarding.agent = selectedAgent as CliAgent;
+  } else if (filteredDefinitions.length > 0) {
+    selectedAgent = filteredDefinitions[0]!.cliName;
   }
 });
 </script>
