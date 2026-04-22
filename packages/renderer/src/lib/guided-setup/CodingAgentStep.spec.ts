@@ -27,12 +27,10 @@ import { createDefaultOnboardingState } from './guided-setup-steps';
 
 let onboarding: OnboardingState;
 
-function stubOllama(ok: boolean): void {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok }));
-}
-
-function stubRamalama(hasConnections: boolean): void {
-  const providers = hasConnections ? [{ id: 'ramalama', inferenceConnections: [{ status: 'started' }] }] : [];
+function stubLocalInference(hasConnection: boolean): void {
+  const providers = hasConnection
+    ? [{ id: 'ollama', inferenceConnections: [{ type: 'local', status: 'started' }] }]
+    : [{ id: 'ollama', inferenceConnections: [] }];
   (window as unknown as Record<string, unknown>).getProviderInfos = vi.fn().mockResolvedValue(providers);
 }
 
@@ -40,9 +38,8 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
   onboarding = createDefaultOnboardingState();
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no server')));
   vi.stubGlobal('listCliAgents', vi.fn().mockResolvedValue(['opencode']));
-  stubRamalama(false);
+  stubLocalInference(false);
 });
 
 function renderStep(overrides: Partial<OnboardingState> = {}): void {
@@ -82,7 +79,6 @@ test('shows local runtime panel when OpenCode is selected', () => {
 });
 
 test('shows probe checking state on mount with OpenCode selected', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
   (window as unknown as Record<string, unknown>).getProviderInfos = vi.fn().mockReturnValue(new Promise(() => {}));
 
   renderStep();
@@ -92,8 +88,8 @@ test('shows probe checking state on mount with OpenCode selected', async () => {
   });
 });
 
-test('shows detected state when Ollama responds successfully', async () => {
-  stubOllama(true);
+test('shows detected state when a local inference connection exists', async () => {
+  stubLocalInference(true);
 
   renderStep();
 
@@ -102,17 +98,7 @@ test('shows detected state when Ollama responds successfully', async () => {
   });
 });
 
-test('shows detected state when Ramalama has inference connections', async () => {
-  stubRamalama(true);
-
-  renderStep();
-
-  await waitFor(() => {
-    expect(screen.getByTestId('probe-detected')).toBeInTheDocument();
-  });
-});
-
-test('shows not-found state when both probes fail', async () => {
+test('shows not-found state when no local inference connections exist', async () => {
   renderStep();
 
   await waitFor(() => {
@@ -127,7 +113,7 @@ test('Check again button retries the probe', async () => {
     expect(screen.getByTestId('probe-not-found')).toBeInTheDocument();
   });
 
-  stubOllama(true);
+  stubLocalInference(true);
 
   await fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
 
