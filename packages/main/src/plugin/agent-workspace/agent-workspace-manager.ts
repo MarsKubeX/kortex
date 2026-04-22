@@ -116,15 +116,7 @@ export class AgentWorkspaceManager implements Disposable {
         console.warn('kdn info returned non-object, falling back to defaults', result.stdout);
         return { version: '', agents: [], runtimes: [] };
       }
-      const record = info as Record<string, unknown>;
-      const version = record['version'];
-      const agents = record['agents'];
-      const runtimes = record['runtimes'];
-      return {
-        version: typeof version === 'string' ? version : '',
-        agents: Array.isArray(agents) && agents.every(a => typeof a === 'string') ? (agents as string[]) : [],
-        runtimes: Array.isArray(runtimes) && runtimes.every(r => typeof r === 'string') ? (runtimes as string[]) : [],
-      };
+      return info as CliInfo;
     } catch (err: unknown) {
       const detail = this.extractCliError(err);
       console.error(`kdn failed: ${cliPath} ${args.join(' ')} — ${detail}`);

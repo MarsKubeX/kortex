@@ -214,14 +214,14 @@ describe('getCliInfo', () => {
     expect(result).toEqual({ version: '0.1.0', agents: ['claude', 'opencode'], runtimes: ['podman'] });
   });
 
-  test('returns empty arrays when CLI returns response without agents or runtimes', async () => {
+  test('preserves extra fields from future CLI versions', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    vi.spyOn(exec, 'exec').mockResolvedValue(mockExecResult(JSON.stringify({ version: '0.1.0' })));
+    const payload = { version: '0.2.0', agents: ['opencode'], runtimes: ['podman'], newField: 'hello' };
+    vi.spyOn(exec, 'exec').mockResolvedValue(mockExecResult(JSON.stringify(payload)));
 
     const result = await manager.getCliInfo();
 
-    expect(result).toEqual({ version: '0.1.0', agents: [], runtimes: [] });
+    expect(result).toEqual(payload);
   });
 
   test('returns defaults when CLI returns non-object response', async () => {
