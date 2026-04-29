@@ -23,7 +23,7 @@ function openDetails(): void {
 }
 </script>
 
-<button class="flex items-center gap-3 overflow-hidden max-w-full" onclick={openDetails}>
+<button class="group flex items-center gap-3 overflow-hidden max-w-full" onclick={openDetails}>
   <div class="shrink-0 flex items-center justify-center">
     <Icon {icon} size="1.5x" />
   </div>

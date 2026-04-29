@@ -77,12 +77,12 @@ test('should show Summary tab', () => {
   expect(screen.getByText('Summary')).toBeInTheDocument();
 });
 
-test('should show fallback title when secret not found', () => {
+test.each(['nonexistent', 'some-missing-id'])('should fallback to id when secret is not found (%s)', id => {
   vi.mocked(secretVaultStore).secretVaultInfos = writable<readonly SecretVaultInfo[]>([]);
 
-  render(SecretVaultDetails, { id: 'nonexistent' });
+  render(SecretVaultDetails, { id });
 
-  expect(screen.getByRole('heading', { name: 'nonexistent', level: 1 })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: id, level: 1 })).toBeInTheDocument();
 });
 
 test('should display remove button', () => {
@@ -125,12 +125,4 @@ test('should not remove secret when user cancels removal', async () => {
 
   expect(window.removeSecret).not.toHaveBeenCalled();
   expect(router.goto).not.toHaveBeenCalled();
-});
-
-test('should fallback to id when secret is not found', () => {
-  vi.mocked(secretVaultStore).secretVaultInfos = writable<readonly SecretVaultInfo[]>([]);
-
-  render(SecretVaultDetails, { id: 'some-missing-id' });
-
-  expect(screen.getByRole('heading', { name: 'some-missing-id', level: 1 })).toBeInTheDocument();
 });

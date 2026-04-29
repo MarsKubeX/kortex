@@ -14,6 +14,7 @@ interface Props {
 let { secretInfo }: Props = $props();
 
 interface UsedByEntry {
+  id: string;
   name: string;
   kind: string;
 }
@@ -41,7 +42,7 @@ $effect(() => {
       try {
         const config = await window.getAgentWorkspaceConfiguration(ws.id);
         if (workspaceUsesSecret(config, name)) {
-          return { name: ws.name, kind: 'Workspace' } satisfies UsedByEntry;
+          return { id: ws.id, name: ws.name, kind: 'Workspace' } satisfies UsedByEntry;
         }
       } catch {
         // skip workspaces whose configuration cannot be read
@@ -117,7 +118,7 @@ $effect(() => {
       <tr>
         <DetailsTitle>Used by</DetailsTitle>
       </tr>
-      {#each usedBy as entry (entry.name)}
+      {#each usedBy as entry (entry.id)}
         <tr>
           <DetailsCell>{entry.name}</DetailsCell>
           <DetailsCell>{entry.kind}</DetailsCell>
