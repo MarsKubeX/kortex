@@ -1,7 +1,4 @@
 <script lang="ts">
-import DetailsCell from '/@/lib/details/DetailsCell.svelte';
-import DetailsTable from '/@/lib/details/DetailsTable.svelte';
-import DetailsTitle from '/@/lib/details/DetailsTitle.svelte';
 import { getServiceLabel } from '/@/lib/secret-vault/secret-vault-utils';
 import { agentWorkspaces } from '/@/stores/agent-workspaces.svelte';
 import type { AgentWorkspaceConfiguration } from '/@api/agent-workspace-info';
@@ -63,67 +60,78 @@ $effect(() => {
     current = false;
   };
 });
+
+interface DetailField {
+  label: string;
+  value: string;
+}
+
+const detailFields: DetailField[] = $derived.by(() => {
+  if (!secretInfo) return [];
+  const fields: DetailField[] = [];
+
+  if (secretInfo.type) {
+    fields.push({ label: 'Type', value: getServiceLabel(secretInfo.type) });
+  }
+  if (secretInfo.description) {
+    fields.push({ label: 'Description', value: secretInfo.description });
+  }
+  if (secretInfo.hosts?.length) {
+    fields.push({ label: 'Hosts', value: secretInfo.hosts.join(', ') });
+  }
+  if (secretInfo.path) {
+    fields.push({ label: 'Path', value: secretInfo.path });
+  }
+  if (secretInfo.header) {
+    fields.push({ label: 'Header', value: secretInfo.header });
+  }
+  if (secretInfo.headerTemplate) {
+    fields.push({ label: 'Header template', value: secretInfo.headerTemplate });
+  }
+  if (secretInfo.envs?.length) {
+    fields.push({ label: 'Environment variables', value: secretInfo.envs.join(', ') });
+  }
+  return fields;
+});
 </script>
 
-<div class="h-min">
-  <DetailsTable>
-    {#if secretInfo?.type}
-      <tr>
-        <DetailsCell>Type</DetailsCell>
-        <DetailsCell>{getServiceLabel(secretInfo.type)}</DetailsCell>
-      </tr>
-    {/if}
-    {#if secretInfo?.description}
-      <tr>
-        <DetailsCell>Description</DetailsCell>
-        <DetailsCell>{secretInfo.description}</DetailsCell>
-      </tr>
-    {/if}
-    {#if secretInfo?.hosts?.length}
-      <tr>
-        <DetailsCell>Hosts</DetailsCell>
-        <DetailsCell>{secretInfo.hosts.join(', ')}</DetailsCell>
-      </tr>
-    {/if}
-    {#if secretInfo?.path}
-      <tr>
-        <DetailsCell>Path</DetailsCell>
-        <DetailsCell>{secretInfo.path}</DetailsCell>
-      </tr>
-    {/if}
-    {#if secretInfo?.header}
-      <tr>
-        <DetailsCell>Header</DetailsCell>
-        <DetailsCell>{secretInfo.header}</DetailsCell>
-      </tr>
-    {/if}
-    {#if secretInfo?.headerTemplate}
-      <tr>
-        <DetailsCell>Header template</DetailsCell>
-        <DetailsCell>{secretInfo.headerTemplate}</DetailsCell>
-      </tr>
-    {/if}
-    {#if secretInfo?.envs?.length}
-      <tr>
-        <DetailsTitle>Environment variables</DetailsTitle>
-      </tr>
-      {#each secretInfo.envs as env (env)}
-        <tr>
-          <DetailsCell>{env}</DetailsCell>
-          <DetailsCell></DetailsCell>
-        </tr>
-      {/each}
-    {/if}
-    {#if usedBy.length}
-      <tr>
-        <DetailsTitle>Used by</DetailsTitle>
-      </tr>
-      {#each usedBy as entry (entry.id)}
-        <tr>
-          <DetailsCell>{entry.name}</DetailsCell>
-          <DetailsCell>{entry.kind}</DetailsCell>
-        </tr>
-      {/each}
-    {/if}
-  </DetailsTable>
+<div class="flex flex-col gap-5 px-5 py-5 overflow-auto" data-testid="secret-vault-details-summary">
+  <!-- Details card -->
+  {#if detailFields.length > 0}
+    <div
+      class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6"
+      data-testid="details-card">
+      <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-4">
+        Details
+      </h3>
+      <div class="grid grid-cols-[160px_1fr] gap-y-3">
+        {#each detailFields as field (field.label)}
+          <span class="text-sm text-(--pd-content-card-text) opacity-60">{field.label}</span>
+          <span class="text-sm text-(--pd-content-card-text)">{field.value}</span>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Used by card -->
+  {#if usedBy.length > 0}
+    <div
+      class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6"
+      data-testid="used-by-card">
+      <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-4">
+        Used By
+      </h3>
+      <div class="flex flex-col">
+        {#each usedBy as entry, i (entry.id)}
+          <div
+            class="flex items-center justify-between py-3"
+            class:border-t={i > 0}
+            class:border-(--pd-content-divider)={i > 0}>
+            <span class="text-sm font-medium text-(--pd-content-card-text)">{entry.name}</span>
+            <span class="text-sm text-(--pd-content-card-text) opacity-50">{entry.kind}</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
 </div>
