@@ -19,4 +19,7 @@
 export enum OnboardingSettings {
   SectionName = 'onboarding',
   DefaultAgent = 'defaultAgent',
+  VertexProjectId = 'vertexProjectId',
+  VertexRegion = 'vertexRegion',
+  VertexCredentialsPath = 'vertexCredentialsPath',
 }

@@ -24,7 +24,7 @@ onMount(async () => {
 
 let filteredDefinitions = $derived.by(() => {
   if (!cliAgents) return agentDefinitions;
-  const filtered = agentDefinitions.filter(d => cliAgents!.includes(d.cliName));
+  const filtered = agentDefinitions.filter(d => cliAgents!.includes(d.cliAgent ?? d.cliName));
   return filtered.length > 0 ? filtered : agentDefinitions;
 });
 
