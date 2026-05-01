@@ -22,10 +22,17 @@ import type { Component } from 'svelte';
 
 import CodingAgentStep from './CodingAgentStep.svelte';
 
-export type CliAgent = 'opencode' | 'claude';
+export type CliAgent = 'opencode' | 'claude' | 'claude-vertex';
+
+export interface VertexConfig {
+  projectId: string;
+  region: string;
+  credentialsPath: string;
+}
 
 export interface OnboardingState {
   agent: CliAgent;
+  vertexConfig?: VertexConfig;
   beforeAdvance?: () => Promise<boolean>;
 }
 

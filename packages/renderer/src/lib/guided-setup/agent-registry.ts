@@ -17,16 +17,23 @@
  ***********************************************************************/
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
-import { faClaude } from '@fortawesome/free-brands-svg-icons';
+import { faClaude, faGoogle } from '@fortawesome/free-brands-svg-icons';
 import { faDesktop } from '@fortawesome/free-solid-svg-icons';
 import type { Component } from 'svelte';
 
 import type { CliAgent } from './guided-setup-steps';
 import ClaudePanel from './panels/ClaudePanel.svelte';
+import ClaudeVertexPanel from './panels/ClaudeVertexPanel.svelte';
 import OpenCodePanel from './panels/OpenCodePanel.svelte';
 
 export interface AgentDefinition {
   cliName: CliAgent;
+  /**
+   * The CLI agent name used for filtering against `kdn info` output.
+   * Allows UI variants (e.g. `claude-vertex`) to match their parent CLI agent (`claude`).
+   * Falls back to {@link cliName} when omitted.
+   */
+  cliAgent?: string;
   title: string;
   description: string;
   badge: string;
@@ -56,5 +63,14 @@ export const agentDefinitions: AgentDefinition[] = [
     panel: ClaudePanel,
     providerSelector: 'kaiden.claude:claude',
     secretType: 'anthropic',
+  },
+  {
+    cliName: 'claude-vertex',
+    cliAgent: 'claude',
+    title: 'Claude on Vertex AI',
+    description: 'Run Claude Code through Google Cloud Vertex AI using your GCP project credentials.',
+    badge: 'Vertex AI',
+    icon: faGoogle,
+    panel: ClaudeVertexPanel,
   },
 ];

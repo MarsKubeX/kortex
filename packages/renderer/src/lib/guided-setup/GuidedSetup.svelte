@@ -30,6 +30,15 @@ function getStepState(index: number): 'completed' | 'active' | 'upcoming' {
 
 async function persistOnboardingDefaults(): Promise<void> {
   await window.updateConfigurationValue('onboarding.defaultAgent', onboardingState.agent);
+
+  if (onboardingState.agent === 'claude-vertex' && onboardingState.vertexConfig) {
+    await window.updateConfigurationValue('onboarding.vertexProjectId', onboardingState.vertexConfig.projectId);
+    await window.updateConfigurationValue('onboarding.vertexRegion', onboardingState.vertexConfig.region);
+    await window.updateConfigurationValue(
+      'onboarding.vertexCredentialsPath',
+      onboardingState.vertexConfig.credentialsPath,
+    );
+  }
 }
 
 async function advance(): Promise<void> {

@@ -228,6 +228,65 @@ describe('Claude agent tile', () => {
   });
 });
 
+describe('Claude on Vertex AI tile', () => {
+  test('renders the Vertex AI tile when CLI includes claude', async () => {
+    renderStep();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Claude on Vertex AI' })).toBeInTheDocument();
+    });
+  });
+
+  test('shows Vertex AI badge on the tile', async () => {
+    renderStep();
+
+    await waitFor(() => {
+      expect(screen.getByText('Vertex AI')).toBeInTheDocument();
+    });
+  });
+
+  test('shows Vertex panel when Claude on Vertex AI is selected', async () => {
+    renderStep();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Claude on Vertex AI' })).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Claude on Vertex AI' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('claude-vertex-panel')).toBeInTheDocument();
+      expect(screen.getByText('Google Cloud Vertex AI')).toBeInTheDocument();
+    });
+  });
+
+  test('updates onboarding.agent when Claude on Vertex AI is selected', async () => {
+    renderStep();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Claude on Vertex AI' })).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Claude on Vertex AI' }));
+
+    await waitFor(() => {
+      expect(onboarding.agent).toBe('claude-vertex');
+    });
+  });
+
+  test('does not show Vertex tile when CLI does not include claude', async () => {
+    vi.mocked(window.getCliInfo).mockResolvedValue({ version: '0.1.0', agents: ['opencode'], runtimes: ['podman'] });
+
+    renderStep();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'OpenCode' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Claude on Vertex AI' })).not.toBeInTheDocument();
+  });
+});
+
 describe('CLI fallback', () => {
   test('falls back to all registry entries when CLI returns empty agents', async () => {
     vi.mocked(window.getCliInfo).mockResolvedValue({ version: '0.1.0', agents: [], runtimes: [] });
