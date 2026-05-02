@@ -52,7 +52,7 @@ export class AgentWorkspaceCreatePage extends BasePage {
     this.descriptionInput = this.page.getByPlaceholder('Short note for your team (optional)');
     this.agentSelector = this.page.getByRole('region', { name: 'Select Coding Agent' });
     this.toolsSummary = this.page.getByText(/Everything available is included|Expand.*Customize/);
-    this.customizeExpandable = this.page.getByText('Customize skills, MCP servers, and vault');
+    this.customizeExpandable = this.page.getByText('Customize skills, MCP servers, vault, and knowledges');
     this.mcpServersPanel = this.page.getByText('MCP Servers', { exact: true });
     this.fileAccessHeading = this.page.getByText('File System Access');
     this.firstCustomPathInput = this.page.getByPlaceholder('/path/to/allowed/directory').first();

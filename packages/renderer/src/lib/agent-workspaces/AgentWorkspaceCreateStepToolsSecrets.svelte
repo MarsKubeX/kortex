@@ -1,5 +1,5 @@
 <script lang="ts">
-import { faKey, faServer, faWrench } from '@fortawesome/free-solid-svg-icons';
+import { faBook, faKey, faServer, faWrench } from '@fortawesome/free-solid-svg-icons';
 import { Button, Expandable } from '@podman-desktop/ui-svelte';
 import { router } from 'tinro';
 
@@ -15,6 +15,8 @@ interface Props {
   mcpItems: ChecklistItem[];
   selectedMcpIds: string[];
   selectedSecretIds: string[];
+  knowledgeItems: ChecklistItem[];
+  selectedKnowledgeIds: string[];
 }
 
 let {
@@ -23,6 +25,8 @@ let {
   mcpItems,
   selectedMcpIds = $bindable(),
   selectedSecretIds = $bindable(),
+  knowledgeItems,
+  selectedKnowledgeIds = $bindable(),
 }: Props = $props();
 
 let secretItems: ChecklistItem[] = $derived(
@@ -36,7 +40,8 @@ let secretItems: ChecklistItem[] = $derived(
 let allIncluded: boolean = $derived(
   selectedSkillIds.length === skillItems.length &&
     selectedMcpIds.length === mcpItems.length &&
-    selectedSecretIds.length === secretItems.length,
+    selectedSecretIds.length === secretItems.length &&
+    selectedKnowledgeIds.length === knowledgeItems.length,
 );
 
 let summaryParts: string[] = $derived(
@@ -44,6 +49,7 @@ let summaryParts: string[] = $derived(
     skillItems.length > 0 ? `${selectedSkillIds.length}/${skillItems.length} skills` : '',
     mcpItems.length > 0 ? `${selectedMcpIds.length}/${mcpItems.length} MCP servers` : '',
     secretItems.length > 0 ? `${selectedSecretIds.length}/${secretItems.length} vault credentials` : '',
+    knowledgeItems.length > 0 ? `${selectedKnowledgeIds.length}/${knowledgeItems.length} knowledges` : '',
   ].filter(Boolean),
 );
 
@@ -57,6 +63,10 @@ function navigateToMcp(): void {
 
 function navigateToSecretVault(): void {
   handleNavigation({ page: NavigationPage.SECRET_VAULT });
+}
+
+function navigateToKnowledges(): void {
+  handleNavigation({ page: NavigationPage.RAG_ENVIRONMENTS });
 }
 </script>
 
@@ -75,7 +85,7 @@ function navigateToSecretVault(): void {
 
 <div class="rounded-xl border border-[var(--pd-content-card-border)] bg-[var(--pd-content-card-bg)] px-4 py-3">
   <Expandable expanded={false}>
-    {#snippet title()}<span class="text-sm font-medium text-[var(--pd-modal-text)]">Customize skills, MCP servers, and vault</span>{/snippet}
+    {#snippet title()}<span class="text-sm font-medium text-[var(--pd-modal-text)]">Customize skills, MCP servers, vault, and knowledges</span>{/snippet}
     <div class="space-y-6 pt-3">
       <ChecklistPanel
         title="Skills"
@@ -110,6 +120,18 @@ function navigateToSecretVault(): void {
         emptyMessage="No secrets in your vault yet.">
         {#snippet headerAction()}
           <Button type="secondary" onclick={navigateToSecretVault}>Open Vault</Button>
+        {/snippet}
+      </ChecklistPanel>
+
+      <ChecklistPanel
+        title="Knowledges"
+        subtitle="Optional retrieval context for the agent"
+        icon={faBook}
+        items={knowledgeItems}
+        bind:selected={selectedKnowledgeIds}
+        emptyMessage="No knowledge bases available yet.">
+        {#snippet headerAction()}
+          <Button type="secondary" onclick={navigateToKnowledges}>Manage Knowledges</Button>
         {/snippet}
       </ChecklistPanel>
     </div>
