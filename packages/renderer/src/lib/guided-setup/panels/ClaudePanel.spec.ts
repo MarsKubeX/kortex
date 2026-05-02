@@ -44,6 +44,7 @@ const claudeDefinition: AgentDefinition = {
   description: 'Cloud agent',
   badge: 'Cloud',
   icon: faClaude,
+  colorClass: 'bg-gradient-to-br from-amber-600 to-amber-500',
   providerSelector: 'kaiden.claude:claude',
   secretType: 'anthropic',
 };

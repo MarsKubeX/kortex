@@ -172,7 +172,7 @@ export class KdnCli {
       return JSON.parse(result.stdout) as T;
     } catch (err: unknown) {
       const detail = this.extractCliError(err);
-      console.error(`kdn failed: ${cliPath} — ${detail}`);
+      console.error(`kdn failed: ${cliPath} ${fullArgs.join(' ')} — ${detail}`);
       throw new Error(detail);
     }
   }

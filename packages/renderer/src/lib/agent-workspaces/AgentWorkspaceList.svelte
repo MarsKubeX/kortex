@@ -1,19 +1,29 @@
 <script lang="ts">
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
-import { Button, FilteredEmptyScreen, NavPage, Table, TableColumn, TableRow } from '@podman-desktop/ui-svelte';
+import {
+  Button,
+  FilteredEmptyScreen,
+  NavPage,
+  SearchInput,
+  Table,
+  TableColumn,
+  TableDurationColumn,
+  TableRow,
+} from '@podman-desktop/ui-svelte';
 
 import NoLogIcon from '/@/lib/ui/NoLogIcon.svelte';
 import { handleNavigation } from '/@/navigation';
 import { agentWorkspaces, type AgentWorkspaceSummaryUI } from '/@/stores/agent-workspaces.svelte';
 import { NavigationPage } from '/@api/navigation-page';
 
-import AgentWorkspaceActions from './AgentWorkspaceActions.svelte';
 import AgentWorkspaceEmptyScreen from './AgentWorkspaceEmptyScreen.svelte';
-import AgentWorkspaceIcon from './columns/AgentWorkspaceIcon.svelte';
+import AgentWorkspaceStatCards from './AgentWorkspaceStatCards.svelte';
+import AgentWorkspaceActions from './columns/AgentWorkspaceActions.svelte';
+import AgentWorkspaceContext from './columns/AgentWorkspaceContext.svelte';
 import AgentWorkspaceName from './columns/AgentWorkspaceName.svelte';
-import AgentWorkspaceStatus from './columns/AgentWorkspaceStatus.svelte';
+import { ACTIVE_GROUP_LABEL, getReferenceTime, isActiveWorkspace, STOPPED_GROUP_LABEL } from './workspace-utils';
 
-type AgentWorkspaceSelectable = AgentWorkspaceSummaryUI & { selected: boolean };
+type WorkspaceSelectable = AgentWorkspaceSummaryUI & { selected: boolean };
 
 let searchTerm = $state('');
 
@@ -21,37 +31,8 @@ function navigateToCreate(): void {
   handleNavigation({ page: NavigationPage.AGENT_WORKSPACE_CREATE });
 }
 
-const row = new TableRow<AgentWorkspaceSelectable>({});
-
-const iconColumn = new TableColumn<AgentWorkspaceSelectable>('', {
-  width: '40px',
-  renderer: AgentWorkspaceIcon,
-});
-
-const nameColumn = new TableColumn<AgentWorkspaceSelectable>('Workspace', {
-  width: '1fr',
-  renderer: AgentWorkspaceName,
-  comparator: (a, b): number => a.name.localeCompare(b.name),
-});
-
-const statusColumn = new TableColumn<AgentWorkspaceSelectable>('Status', {
-  width: '100px',
-  align: 'center',
-  renderer: AgentWorkspaceStatus,
-  comparator: (a, b): number => a.state.localeCompare(b.state),
-});
-
-const actionsColumn = new TableColumn<AgentWorkspaceSelectable>('Actions', {
-  width: '90px',
-  align: 'right',
-  renderer: AgentWorkspaceActions,
-  overflow: true,
-});
-
-const columns = [iconColumn, nameColumn, statusColumn, actionsColumn];
-
-const filteredWorkspaces: AgentWorkspaceSelectable[] = $derived.by(() => {
-  const term = searchTerm.toLowerCase();
+const filteredWorkspaces: WorkspaceSelectable[] = $derived.by(() => {
+  const term = searchTerm.trim().toLowerCase();
   return $agentWorkspaces
     .filter(
       ws =>
@@ -62,31 +43,98 @@ const filteredWorkspaces: AgentWorkspaceSelectable[] = $derived.by(() => {
     )
     .map(ws => ({ ...ws, selected: false }));
 });
+
+const activeWorkspaces = $derived(filteredWorkspaces.filter(isActiveWorkspace));
+const stoppedWorkspaces = $derived(filteredWorkspaces.filter(ws => !isActiveWorkspace(ws)));
+
+const hasBothGroups: boolean = $derived(activeWorkspaces.length > 0 && stoppedWorkspaces.length > 0);
+
+const row = new TableRow<WorkspaceSelectable>({});
+
+const nameColumn = new TableColumn<WorkspaceSelectable>('Workspace', {
+  width: '3fr',
+  renderer: AgentWorkspaceName,
+  comparator: (a, b): number => a.name.localeCompare(b.name),
+});
+
+const contextColumn = new TableColumn<WorkspaceSelectable>('Context', {
+  width: '2fr',
+  renderer: AgentWorkspaceContext,
+});
+
+const timeColumn = new TableColumn<WorkspaceSelectable, Date | undefined>('Time', {
+  renderer: TableDurationColumn,
+  renderMapping: (ws): Date | undefined => {
+    const refTime = getReferenceTime(ws);
+    return refTime ? new Date(refTime) : undefined;
+  },
+  comparator: (a, b): number => {
+    return (getReferenceTime(a) ?? 0) - (getReferenceTime(b) ?? 0);
+  },
+});
+
+const actionsColumn = new TableColumn<WorkspaceSelectable>('', {
+  align: 'right',
+  width: '60px',
+  renderer: AgentWorkspaceActions,
+  overflow: true,
+});
+
+const columns = [nameColumn, contextColumn, timeColumn, actionsColumn];
 </script>
 
-<NavPage bind:searchTerm={searchTerm} title="Agentic Workspaces">
+<NavPage bind:searchTerm={searchTerm} searchEnabled={false} title="Agentic Workspaces">
   {#snippet additionalActions()}
-  <Button icon={faPlus} onclick={navigateToCreate}>Create Workspace</Button>
+    <Button icon={faPlus} onclick={navigateToCreate}>Create Workspace</Button>
   {/snippet}
 
   {#snippet content()}
     <div class="flex flex-col min-w-full h-full">
-      <span class="text-sm text-(--pd-content-text) opacity-70 px-5 pt-4">{filteredWorkspaces.length} total {filteredWorkspaces.length === 1 ? 'session' : 'sessions'}</span>
-      <div class="flex min-w-full min-h-0 flex-1">
+      <div class="px-5 pt-4 pb-4">
+        <AgentWorkspaceStatCards workspaces={$agentWorkspaces} />
+        <SearchInput bind:searchTerm={searchTerm} title="Agentic Workspaces" />
+      </div>
+
+      <div class="flex flex-col min-w-full min-h-0 flex-1 overflow-auto">
         {#if filteredWorkspaces.length === 0}
           {#if searchTerm}
             <FilteredEmptyScreen icon={NoLogIcon} kind="sessions" bind:searchTerm={searchTerm} />
           {:else}
             <AgentWorkspaceEmptyScreen />
           {/if}
+        {:else if !hasBothGroups}
+          <div class="flex min-w-full">
+            <Table
+              kind="agent-workspaces"
+              data={filteredWorkspaces}
+              columns={columns}
+              row={row}
+              defaultSortColumn="Workspace"
+            />
+          </div>
         {:else}
-          <Table
-            kind="agent-workspaces"
-            data={filteredWorkspaces}
-            columns={columns}
-            row={row}
-            defaultSortColumn="Workspace"
-          />
+          <div class="flex flex-col w-full">
+            <div class="mx-5 pt-2 text-sm font-semibold uppercase tracking-wider text-[var(--pd-table-header-text)]">{ACTIVE_GROUP_LABEL}</div>
+            <div class="flex min-w-full">
+              <Table
+                kind="agent-workspaces-active"
+                data={activeWorkspaces}
+                columns={columns}
+                row={row}
+                defaultSortColumn="Workspace"
+              />
+            </div>
+            <div class="mx-5 pt-2 text-sm font-semibold uppercase tracking-wider text-[var(--pd-table-header-text)]">{STOPPED_GROUP_LABEL}</div>
+            <div class="flex min-w-full">
+              <Table
+                kind="agent-workspaces-stopped"
+                data={stoppedWorkspaces}
+                columns={columns}
+                row={row}
+                defaultSortColumn="Workspace"
+              />
+            </div>
+          </div>
         {/if}
       </div>
     </div>

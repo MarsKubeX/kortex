@@ -18,7 +18,7 @@
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
 import { faClaude, faGoogle } from '@fortawesome/free-brands-svg-icons';
-import { faDesktop } from '@fortawesome/free-solid-svg-icons';
+import { faDesktop, faRobot } from '@fortawesome/free-solid-svg-icons';
 import type { Component } from 'svelte';
 
 import type { CliAgent } from './guided-setup-steps';
@@ -35,23 +35,30 @@ export interface AgentDefinition {
    */
   cliAgent?: string;
   title: string;
-  description: string;
-  badge: string;
   icon: IconDefinition;
+  colorClass: string;
+  description?: string;
+  badge?: string;
   panel?: Component;
   /** Compound selector in the form `extensionId:providerId` (e.g. `kaiden.claude:claude`). */
   providerSelector?: string;
   secretType?: string;
 }
 
+const DEFAULT_DEFINITION: Omit<AgentDefinition, 'cliName' | 'title'> = {
+  icon: faRobot,
+  colorClass: 'bg-gradient-to-br from-purple-500 to-purple-600',
+};
+
 export const agentDefinitions: AgentDefinition[] = [
   {
     cliName: 'opencode',
     title: 'OpenCode',
+    icon: faDesktop,
+    colorClass: 'bg-gradient-to-br from-green-500 to-green-600',
     description:
       'Open-source agent on your machine - local models via Ollama or Ramalama, or cloud APIs (OpenAI, Gemini, and other providers OpenCode supports).',
     badge: 'Recommended',
-    icon: faDesktop,
     panel: OpenCodePanel,
   },
   {
@@ -60,6 +67,7 @@ export const agentDefinitions: AgentDefinition[] = [
     description: 'Anthropic\u2019s cloud agent \u2014 connect with an API key to access Claude models.',
     badge: 'Cloud',
     icon: faClaude,
+    colorClass: 'bg-gradient-to-br from-amber-600 to-amber-500',
     panel: ClaudePanel,
     providerSelector: 'kaiden.claude:claude',
     secretType: 'anthropic',
@@ -71,6 +79,15 @@ export const agentDefinitions: AgentDefinition[] = [
     description: 'Run Claude Code through Google Cloud Vertex AI using your GCP project credentials.',
     badge: 'Vertex AI',
     icon: faGoogle,
+    colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600',
     panel: ClaudeVertexPanel,
   },
 ];
+
+export type ResolvedAgentDefinition = Omit<AgentDefinition, 'cliName'> & { cliName: string };
+
+const agentMap = new Map<string, AgentDefinition>(agentDefinitions.map(d => [d.cliName, d]));
+
+export function getAgentDefinition(name: string): ResolvedAgentDefinition {
+  return agentMap.get(name) ?? { ...DEFAULT_DEFINITION, cliName: name, title: name };
+}

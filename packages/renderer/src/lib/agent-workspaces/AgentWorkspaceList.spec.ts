@@ -18,7 +18,7 @@
 
 import '@testing-library/jest-dom/vitest';
 
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, within } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { agentWorkspaces } from '/@/stores/agent-workspaces.svelte';
@@ -37,13 +37,19 @@ test('Expect empty screen when no workspaces', () => {
   expect(screen.getByText('No agent workspaces')).toBeInTheDocument();
 });
 
-test('Expect total count displayed as 0 total sessions when empty', () => {
+test('Expect stat cards show zero counts when empty', () => {
   render(AgentWorkspaceList);
 
-  expect(screen.getByText('0 total sessions')).toBeInTheDocument();
+  const activeCard = screen.getByText('Active Sessions').closest('div')!;
+  const totalCard = screen.getByText('Total Sessions').closest('div')!;
+  const agentsCard = screen.getByText('Configured Agents').closest('div')!;
+
+  expect(within(activeCard).getByText('0')).toBeInTheDocument();
+  expect(within(totalCard).getByText('0')).toBeInTheDocument();
+  expect(within(agentsCard).getByText('0')).toBeInTheDocument();
 });
 
-test('Expect workspace rows displayed with total count', () => {
+test('Expect stat cards show correct counts with workspaces', () => {
   const workspaces: AgentWorkspaceSummary[] = [
     {
       id: 'ws-1',
@@ -76,7 +82,13 @@ test('Expect workspace rows displayed with total count', () => {
 
   expect(screen.getByText('api-refactor')).toBeInTheDocument();
   expect(screen.getByText('frontend-redesign')).toBeInTheDocument();
-  expect(screen.getByText('2 total sessions')).toBeInTheDocument();
+  const activeCard = screen.getByText('Active Sessions').closest('div')!;
+  const totalCard = screen.getByText('Total Sessions').closest('div')!;
+  const agentsCard = screen.getByText('Configured Agents').closest('div')!;
+
+  expect(within(activeCard).getByText('1')).toBeInTheDocument();
+  expect(within(totalCard).getByText('2')).toBeInTheDocument();
+  expect(within(agentsCard).getByText('2')).toBeInTheDocument();
 });
 
 test('Expect page title to be Agentic Workspaces', () => {
