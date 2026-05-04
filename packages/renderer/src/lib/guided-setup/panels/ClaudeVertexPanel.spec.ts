@@ -30,7 +30,7 @@ let onboarding: OnboardingState;
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
-  onboarding = { agent: 'claude-vertex' };
+  onboarding = { agent: 'claude-vertex', model: undefined };
   vi.stubGlobal('openExternal', vi.fn().mockResolvedValue(undefined));
   vi.stubGlobal('openDialog', vi.fn().mockResolvedValue(undefined));
 });
@@ -61,11 +61,11 @@ describe('rendering', () => {
     expect(screen.queryByLabelText('CLAUDE_CODE_USE_VERTEX')).not.toBeInTheDocument();
   });
 
-  test('region input defaults to global', () => {
+  test('region input defaults to us-east5', () => {
     renderPanel();
 
     const regionInput = screen.getByLabelText('CLOUD_ML_REGION') as HTMLInputElement;
-    expect(regionInput.value).toBe('global');
+    expect(regionInput.value).toBe('us-east5');
   });
 
   test('shows informational text about workspace.json mapping', () => {
@@ -159,8 +159,9 @@ describe('beforeAdvance callback', () => {
     expect(result).toBe(true);
     expect(onboarding.vertexConfig).toEqual({
       projectId: 'my-gcp-project',
-      region: 'global',
+      region: 'us-east5',
       credentialsPath: '/home/user/.config/gcloud',
+      mountClaudeConfig: false,
     });
   });
 
@@ -181,6 +182,7 @@ describe('beforeAdvance callback', () => {
       projectId: 'my-project',
       region: 'europe-west1',
       credentialsPath: '/home/user/.config/gcloud',
+      mountClaudeConfig: false,
     });
   });
 
@@ -201,6 +203,7 @@ describe('beforeAdvance callback', () => {
       projectId: 'my-project',
       region: 'europe-west1',
       credentialsPath: '/home/user/.config/gcloud',
+      mountClaudeConfig: false,
     });
   });
 });

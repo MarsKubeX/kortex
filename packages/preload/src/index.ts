@@ -148,6 +148,7 @@ import type { SkillFileContent, SkillFolderInfo, SkillInfo, SkillResourceEntry }
 import type { StatusBarEntryDescriptor } from '/@api/status-bar';
 import type { PinOption } from '/@api/status-bar/pin-option';
 import type { TelemetryMessages } from '/@api/telemetry';
+import type { VertexAiModelInfo, VertexAiModelListRequest } from '/@api/vertex-ai-info';
 import type { ViewInfoUI } from '/@api/view-info';
 import type { VolumeInspectInfo, VolumeListInfo } from '/@api/volume-info';
 import type { WebviewInfo } from '/@api/webview-info';
@@ -439,6 +440,13 @@ export function initExposure(): void {
   contextBridge.exposeInMainWorld('listSecretServices', async (): Promise<SecretService[]> => {
     return ipcInvoke('secret-manager:list-services');
   });
+
+  contextBridge.exposeInMainWorld(
+    'listVertexAiModels',
+    async (request: VertexAiModelListRequest): Promise<VertexAiModelInfo[]> => {
+      return ipcInvoke('vertex-ai:list-models', request);
+    },
+  );
 
   contextBridge.exposeInMainWorld('listFlows', async (): Promise<Array<FlowInfo>> => {
     return ipcInvoke('flows:list');

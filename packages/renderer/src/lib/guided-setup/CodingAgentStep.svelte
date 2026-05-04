@@ -23,9 +23,10 @@ onMount(async () => {
 });
 
 let filteredDefinitions = $derived.by(() => {
-  if (!cliAgents) return agentDefinitions;
-  const filtered = agentDefinitions.filter(d => cliAgents!.includes(d.cliAgent ?? d.cliName));
-  return filtered.length > 0 ? filtered : agentDefinitions;
+  const withPanel = agentDefinitions.filter(d => d.panel);
+  if (!cliAgents) return withPanel;
+  const filtered = withPanel.filter(d => cliAgents!.includes(d.cliAgent ?? d.cliName));
+  return filtered.length > 0 ? filtered : withPanel;
 });
 
 const definitionsByAgent = $derived(new Map<string, AgentDefinition>(filteredDefinitions.map(d => [d.cliName, d])));

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faCircleCheck, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { ErrorMessage, Input } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 
@@ -27,9 +27,17 @@ let apiKey = $state('');
 let errorMessage = $state('');
 
 let claudeProvider = $derived($providerInfos.find(p => p.id === providerId));
+let alreadyConnected = $derived(claudeProvider !== undefined && claudeProvider.inferenceConnections.length > 0);
 
 async function validate(): Promise<boolean> {
   errorMessage = '';
+
+  if (alreadyConnected) {
+    if (onboarding) {
+      onboarding.secretName = secretType;
+    }
+    return true;
+  }
 
   if (!claudeProvider) {
     errorMessage = 'Claude provider extension is not available. Make sure the Claude extension is enabled.';
@@ -42,14 +50,21 @@ async function validate(): Promise<boolean> {
   }
 
   try {
-    await window.createSecret({
+    const result = await window.createSecret({
       name: secretType,
       type: secretType,
       value: apiKey.trim(),
     });
+    if (onboarding) {
+      onboarding.secretName = result.name;
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (!msg.includes('already exists')) {
+    if (msg.includes('already exists')) {
+      if (onboarding) {
+        onboarding.secretName = secretType;
+      }
+    } else {
       errorMessage = `Failed to store secret: ${msg}`;
       return false;
     }
@@ -98,7 +113,25 @@ $effect(() => {
   </p>
 
   <div class="flex flex-col gap-3" data-testid="claude-form">
-    {#if !claudeProvider}
+    {#if alreadyConnected}
+      <div
+        class="flex items-center gap-3 rounded-lg bg-(--pd-content-card-bg) border border-(--pd-state-success) p-4"
+        role="status"
+        data-testid="claude-already-connected">
+        <Icon icon={faCircleCheck} size="lg" class="text-(--pd-state-success)" />
+        <div>
+          <strong class="text-sm text-(--pd-state-success)">Connection configured</strong>
+          <p class="text-xs text-(--pd-content-card-text) opacity-70 mt-0.5">
+            An Anthropic API key is already stored. You can continue to the next step.
+          </p>
+        </div>
+      </div>
+      <Input
+        type="password"
+        value="••••••••••••••••"
+        aria-label="Anthropic API key"
+        disabled />
+    {:else if !claudeProvider}
       <div
         class="flex items-center gap-2 rounded-lg bg-(--pd-content-card-bg) border border-(--pd-state-warning) p-3"
         role="alert"
@@ -106,14 +139,13 @@ $effect(() => {
         <Icon icon={faTriangleExclamation} size="sm" class="text-(--pd-state-warning) shrink-0" />
         <span class="text-xs text-(--pd-state-warning)">Claude provider extension not detected.</span>
       </div>
+    {:else}
+      <Input
+        type="password"
+        placeholder="sk-ant-..."
+        bind:value={apiKey}
+        aria-label="Anthropic API key" />
     {/if}
-
-    <Input
-      type="password"
-      placeholder="sk-ant-..."
-      bind:value={apiKey}
-      aria-label="Anthropic API key"
-      disabled={!claudeProvider} />
 
     {#if errorMessage}
       <ErrorMessage error={errorMessage} />

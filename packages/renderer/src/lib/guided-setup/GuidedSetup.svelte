@@ -4,6 +4,7 @@ import { Button } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 import { SvelteSet } from 'svelte/reactivity';
 
+import { getAgentDefinition } from './agent-registry';
 import { createDefaultOnboardingState, guidedSetupSteps } from './guided-setup-steps';
 
 interface Props {
@@ -28,17 +29,60 @@ function getStepState(index: number): 'completed' | 'active' | 'upcoming' {
   return 'upcoming';
 }
 
-async function persistOnboardingDefaults(): Promise<void> {
-  await window.updateConfigurationValue('onboarding.defaultAgent', onboardingState.agent);
+interface WorkspaceEnvVar {
+  name: string;
+  value?: string;
+  secret?: string;
+}
 
-  if (onboardingState.agent === 'claude-vertex' && onboardingState.vertexConfig) {
-    await window.updateConfigurationValue('onboarding.vertexProjectId', onboardingState.vertexConfig.projectId);
-    await window.updateConfigurationValue('onboarding.vertexRegion', onboardingState.vertexConfig.region);
-    await window.updateConfigurationValue(
-      'onboarding.vertexCredentialsPath',
-      onboardingState.vertexConfig.credentialsPath,
-    );
+interface WorkspaceMount {
+  host: string;
+  target: string;
+  ro: boolean;
+}
+
+function buildWorkspaceConfig(): { environment: WorkspaceEnvVar[]; mounts: WorkspaceMount[] } {
+  const agent = onboardingState.agent;
+
+  if (agent === 'claude' && onboardingState.secretName) {
+    return {
+      environment: [{ name: 'ANTHROPIC_API_KEY', secret: onboardingState.secretName }],
+      mounts: [],
+    };
   }
+
+  if (agent === 'claude-vertex' && onboardingState.vertexConfig) {
+    const { projectId, region, credentialsPath, mountClaudeConfig } = onboardingState.vertexConfig;
+    const mounts: WorkspaceMount[] = [{ host: credentialsPath, target: '$HOME/.config/gcloud', ro: true }];
+    if (mountClaudeConfig) {
+      mounts.push({ host: '$HOME/.claude', target: '$HOME/.claude', ro: true });
+      mounts.push({ host: '$HOME/.claude.json', target: '$HOME/.claude.json', ro: true });
+    }
+    return {
+      environment: [
+        { name: 'CLAUDE_CODE_USE_VERTEX', value: '1' },
+        { name: 'ANTHROPIC_VERTEX_PROJECT_ID', value: projectId },
+        { name: 'CLOUD_ML_REGION', value: region },
+      ],
+      mounts,
+    };
+  }
+
+  return { environment: [], mounts: [] };
+}
+
+async function persistOnboardingDefaults(): Promise<void> {
+  const resolvedAgent = getAgentDefinition(onboardingState.agent).cliAgent ?? onboardingState.agent;
+
+  const settings = {
+    agent: resolvedAgent,
+    model: onboardingState.model ?? undefined,
+    workspaceConfig: buildWorkspaceConfig(),
+  };
+
+  // Strip Svelte reactive proxies so the value is safe for structured-clone over IPC
+  const plain = JSON.parse(JSON.stringify(settings));
+  await window.updateConfigurationValue('onboarding.defaultWorkspaceSettings', plain);
 }
 
 async function advance(): Promise<void> {
@@ -73,16 +117,15 @@ async function handleContinue(): Promise<void> {
   }
 }
 
-async function handleSkip(): Promise<void> {
-  if (advancing) return;
-  advancing = true;
-  try {
-    await advance();
-  } catch (err: unknown) {
-    console.error('advance failed', err);
-  } finally {
-    advancing = false;
-  }
+function handleSkip(): void {
+  onclose();
+}
+
+let isFirstStep = $derived(currentStepIndex === 0);
+
+function handleBack(): void {
+  if (advancing || isFirstStep) return;
+  currentStepIndex--;
 }
 
 function handleStepClick(index: number): void {
@@ -147,10 +190,15 @@ function handleStepClick(index: number): void {
   </div>
 
   <!-- Footer -->
-  <footer class="flex justify-end gap-3 px-8 py-6 bg-(--pd-content-bg)">
-    {#if currentStep?.isSkippable}
+  <footer class="flex items-center justify-between px-8 py-6 bg-(--pd-content-bg)">
+    <div>
+      {#if !isFirstStep}
+        <Button type="secondary" aria-label="Back" onclick={handleBack} disabled={advancing}>&lsaquo; Back</Button>
+      {/if}
+    </div>
+    <div class="flex gap-3">
       <Button type="secondary" aria-label="Skip" onclick={handleSkip} disabled={advancing}>Skip</Button>
-    {/if}
-    <Button type="primary" aria-label={continueLabel} onclick={handleContinue} disabled={advancing}>{continueLabel} &rsaquo;</Button>
+      <Button type="primary" aria-label={continueLabel} onclick={handleContinue} disabled={advancing}>{continueLabel} &rsaquo;</Button>
+    </div>
   </footer>
 </div>

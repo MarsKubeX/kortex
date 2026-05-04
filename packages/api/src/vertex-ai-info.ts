@@ -16,7 +16,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-export enum OnboardingSettings {
-  SectionName = 'onboarding',
-  DefaultWorkspaceSettings = 'defaultWorkspaceSettings',
+export interface VertexAiModelListRequest {
+  projectId: string;
+  region: string;
+  credentialsPath: string;
+}
+
+export interface VertexAiModelInfo {
+  name: string;
+  displayName: string;
 }

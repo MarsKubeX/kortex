@@ -12,7 +12,7 @@ interface Props {
 let { onboarding }: Props = $props();
 
 let projectId = $state('');
-let region = $state('global');
+let region = $state('us-east5');
 let credentialsPath = $state('');
 let mountClaudeConfig = $state(false);
 let errorMessage = $state('');
@@ -64,6 +64,7 @@ async function validate(): Promise<boolean> {
       projectId: projectId.trim(),
       region: region.trim(),
       credentialsPath: credentialsPath.trim(),
+      mountClaudeConfig,
     };
   }
 

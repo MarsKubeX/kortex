@@ -60,6 +60,7 @@ vi.mock(import('./guided-setup-steps'), async importOriginal => {
     ] satisfies GuidedSetupStep[],
     createDefaultOnboardingState: (): OnboardingState => ({
       agent: 'opencode',
+      model: undefined,
     }),
   };
 });
@@ -103,14 +104,14 @@ test('"Continue" advances to next step', async () => {
   expect(secondStepButton).toHaveAttribute('aria-current', 'step');
 });
 
-test('"Skip" advances to next step', async () => {
+test('"Skip" closes the wizard without saving', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   const skipButton = screen.getByRole('button', { name: 'Skip' });
   await fireEvent.click(skipButton);
 
-  const secondStepButton = screen.getByRole('button', { name: 'Step B step' });
-  expect(secondStepButton).toHaveAttribute('aria-current', 'step');
+  expect(closeMock).toHaveBeenCalled();
+  expect(window.updateConfigurationValue).not.toHaveBeenCalled();
 });
 
 test('completed steps are tracked after Continue', async () => {
@@ -124,14 +125,16 @@ test('completed steps are tracked after Continue', async () => {
   expect(firstStepButton).toBeEnabled();
 });
 
-test('skipped steps are not marked completed', async () => {
+test('"Skip" is always visible regardless of step', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
-  const skipButton = screen.getByRole('button', { name: 'Skip' });
-  await fireEvent.click(skipButton);
+  expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
 
-  const firstStepButton = screen.getByRole('button', { name: 'Step A step' });
-  expect(firstStepButton).toBeDisabled();
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
 });
 
 test('last step shows "Go to Dashboard" instead of "Continue"', async () => {
@@ -187,16 +190,35 @@ test('stepper progress bar has correct number of connector lines', () => {
   expect(connectors.length).toBe(2);
 });
 
-test('Skip button is not shown for non-skippable steps', async () => {
+test('"Back" button is not shown on the first step', () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+});
+
+test('"Back" button appears on the second step', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
-  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
-  expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
 });
 
-test('persists default agent to settings.json when wizard completes', async () => {
+test('"Back" navigates to the previous step', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+
+  const secondStepButton = screen.getByRole('button', { name: 'Step B step' });
+  expect(secondStepButton).toHaveAttribute('aria-current', 'step');
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+  const firstStepButton = screen.getByRole('button', { name: 'Step A step' });
+  expect(firstStepButton).toHaveAttribute('aria-current', 'step');
+});
+
+test('persists defaultWorkspaceSettings as object when wizard completes', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
@@ -204,20 +226,24 @@ test('persists default agent to settings.json when wizard completes', async () =
   await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
 
   await waitFor(() => {
-    expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
+    expect(window.updateConfigurationValue).toHaveBeenCalledWith(
+      'onboarding.defaultWorkspaceSettings',
+      expect.objectContaining({
+        agent: 'opencode',
+        workspaceConfig: { environment: [], mounts: [] },
+      }),
+    );
   });
 });
 
-test('persists defaults when skipping to the end', async () => {
+test('"Skip" does not persist any defaults', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
   await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-  await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
 
-  await waitFor(() => {
-    expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
-  });
+  expect(closeMock).toHaveBeenCalled();
+  expect(window.updateConfigurationValue).not.toHaveBeenCalled();
 });
 
 test('closes wizard even when persistence fails', async () => {

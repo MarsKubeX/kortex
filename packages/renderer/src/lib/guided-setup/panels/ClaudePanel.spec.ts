@@ -71,7 +71,7 @@ let onboarding: OnboardingState;
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
-  onboarding = { agent: 'claude' };
+  onboarding = { agent: 'claude', model: undefined };
   vi.stubGlobal('createSecret', vi.fn().mockResolvedValue({ name: 'anthropic' }));
   vi.stubGlobal('createInferenceProviderConnection', vi.fn().mockResolvedValue(undefined));
   stubClaudeProvider();
@@ -101,13 +101,29 @@ describe('rendering', () => {
     renderPanel();
 
     expect(screen.getByTestId('claude-provider-missing')).toBeInTheDocument();
-    expect(screen.getByLabelText('Anthropic API key')).toBeDisabled();
+    expect(screen.queryByLabelText('Anthropic API key')).not.toBeInTheDocument();
   });
 
   test('does not show error message initially', () => {
     renderPanel();
 
     expect(screen.queryByText(/Please enter your Anthropic API key/)).not.toBeInTheDocument();
+  });
+
+  test('shows connected state when inference connection already exists', () => {
+    stubClaudeProvider({ withModels: true });
+    renderPanel();
+
+    expect(screen.getByTestId('claude-already-connected')).toBeInTheDocument();
+    expect(screen.getByText('Connection configured')).toBeInTheDocument();
+    expect(screen.getByLabelText('Anthropic API key')).toBeDisabled();
+  });
+
+  test('does not show connected state when no connection exists', () => {
+    stubClaudeProvider();
+    renderPanel();
+
+    expect(screen.queryByTestId('claude-already-connected')).not.toBeInTheDocument();
   });
 });
 
@@ -117,6 +133,17 @@ describe('beforeAdvance callback', () => {
 
     expect(onboarding.beforeAdvance).toBeDefined();
     expect(typeof onboarding.beforeAdvance).toBe('function');
+  });
+
+  test('returns true immediately when connection already exists', async () => {
+    stubClaudeProvider({ withModels: true });
+    renderPanel();
+
+    const result = await onboarding.beforeAdvance!();
+
+    expect(result).toBe(true);
+    expect(window.createSecret).not.toHaveBeenCalled();
+    expect(window.createInferenceProviderConnection).not.toHaveBeenCalled();
   });
 
   test('returns false and shows error when API key is empty', async () => {
