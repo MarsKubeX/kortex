@@ -88,6 +88,9 @@ export interface NavigationParameters {
   };
   [NavigationPage.SECRET_VAULT]: never;
   [NavigationPage.SECRET_VAULT_CREATE]: never;
+  [NavigationPage.SECRET_VAULT_DETAILS]: {
+    id: string;
+  };
   [NavigationPage.MODELS]: never;
 }
 
