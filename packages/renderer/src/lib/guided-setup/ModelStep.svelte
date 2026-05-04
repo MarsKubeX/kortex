@@ -65,11 +65,13 @@ let localModels = $derived(allModels.filter(m => m.type === 'local'));
 let selfHostedModels = $derived(allModels.filter(m => m.type === 'self-hosted'));
 let cloudModels = $derived(allModels.filter(m => m.type === 'cloud'));
 
-let userSelectionLabel = $state(untrack(() => onboarding.model?.label ?? ''));
+let userSelectionKey = $state(
+  untrack(() => (onboarding.model ? getModelKey(onboarding.model as CatalogModelInfo) : '')),
+);
 
 let effectiveModel: CatalogModelInfo | undefined = $derived.by(() => {
-  if (userSelectionLabel) {
-    const match = allModels.find(m => m.label === userSelectionLabel);
+  if (userSelectionKey) {
+    const match = allModels.find(m => getModelKey(m) === userSelectionKey);
     if (match) return match;
   }
   return allModels.length > 0 ? allModels[0] : undefined;
@@ -88,7 +90,7 @@ $effect(() => {
 });
 
 function selectModel(model: CatalogModelInfo): void {
-  userSelectionLabel = model.label;
+  userSelectionKey = getModelKey(model);
 }
 
 function uniqueProviderNames(models: CatalogModelInfo[]): string {

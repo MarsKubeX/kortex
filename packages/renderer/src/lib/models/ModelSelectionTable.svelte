@@ -58,8 +58,8 @@ function handleKeydown(e: KeyboardEvent, model: CatalogModelInfo): void {
         {@const key = getKey(model)}
         {@const isSelected = selectedKey === key}
         <tr
-          role="button"
           tabindex="0"
+          aria-selected={isSelected}
           class="border-b border-(--pd-content-divider) last:border-b-0 transition-colors
             cursor-pointer hover:bg-(--pd-content-card-hover-inset-bg)
             {isSelected ? 'bg-(--pd-content-card-hover-inset-bg)' : ''}"
