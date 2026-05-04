@@ -45,6 +45,12 @@ export type AgentWorkspaceConfiguration = configComponents['schemas']['Workspace
 export type CliInfo = cliComponents['schemas']['Info'];
 
 /**
+ * The schema for a workspace's network configuration
+ * Matches the contract in @openkaiden/workspace-configuration.
+ */
+export type NetworkConfiguration = configComponents['schemas']['NetworkConfiguration'];
+
+/**
  * Options for creating (initializing) a new workspace via `kdn init`.
  */
 export interface AgentWorkspaceCreateOptions {
@@ -55,4 +61,5 @@ export interface AgentWorkspaceCreateOptions {
   name?: string;
   project?: string;
   skills?: string[];
+  network?: NetworkConfiguration;
 }

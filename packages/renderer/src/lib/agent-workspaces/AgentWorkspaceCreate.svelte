@@ -22,6 +22,7 @@ import { providerInfos } from '/@/stores/providers';
 import { ragEnvironments } from '/@/stores/rag-environments';
 import { secretVaultInfos } from '/@/stores/secret-vault';
 import { skillInfos } from '/@/stores/skills';
+import type { NetworkConfiguration } from '/@api/agent-workspace-info';
 import { NavigationPage } from '/@api/navigation-page';
 
 const fileAccessOptions: FileAccessOption[] = [
@@ -87,6 +88,21 @@ const networkOptions: NetworkAccessOption[] = [
     notes: 'Trusted setups',
   },
 ];
+
+const REGISTRY_HOSTS = ['registry.npmjs.org', 'pypi.python.org'];
+
+function mapNetworkSelection(value: string): NetworkConfiguration | undefined {
+  switch (value) {
+    case 'open':
+      return { mode: 'allow' };
+    case 'registries':
+      return { mode: 'deny', hosts: REGISTRY_HOSTS };
+    case 'blocked':
+      return { mode: 'deny' };
+    default:
+      return undefined;
+  }
+}
 
 const wizardSteps = [
   { id: 'workspace', title: 'Workspace' },
@@ -235,6 +251,7 @@ async function startWorkspace(): Promise<void> {
 
   try {
     const selectedSkillPaths = $skillInfos.filter(s => selectedSkillIds.includes(s.name)).map(s => s.path);
+    const network = mapNetworkSelection(selectedNetwork);
 
     const agentDef = agentDefinitions.find(d => d.cliName === selectedAgent);
     await window.createAgentWorkspace({
@@ -243,6 +260,7 @@ async function startWorkspace(): Promise<void> {
       model: selectedModel || undefined,
       name: sessionName,
       skills: selectedSkillPaths.length > 0 ? selectedSkillPaths : undefined,
+      network,
     });
   } catch (err: unknown) {
     console.error('Failed to create agent workspace', err);
