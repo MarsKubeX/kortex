@@ -63,7 +63,7 @@ async function validate(): Promise<boolean> {
     onboarding.vertexConfig = {
       projectId: projectId.trim(),
       region: region.trim(),
-      credentialsPath: credentialsPath.trim(),
+      credentialsDir: credentialsPath.trim(),
       mountClaudeConfig,
     };
   }

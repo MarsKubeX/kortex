@@ -1,10 +1,10 @@
 <script lang="ts">
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
-import { StatusIcon } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 
 import { agentDefinitions } from '/@/lib/guided-setup/agent-registry';
 import { type CatalogModelInfo, getCatalogModels } from '/@/lib/models/models-utils';
+import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
 import { handleNavigation } from '/@/navigation';
 import { disabledModels, isModelEnabled, modelKey } from '/@/stores/model-catalog';
 import { providerInfos } from '/@/stores/providers';
@@ -23,15 +23,6 @@ const categoryLabels: Record<ModelCategory, string> = {
   cloud: 'Cloud · LLM providers',
   corporate: 'In-house · OpenShift AI',
   local: 'Local · Ollama & Ramalama',
-};
-
-const statusMap: Record<string, string> = {
-  started: 'RUNNING',
-  starting: 'STARTING',
-  stopped: 'CREATED',
-  stopping: 'DELETING',
-  failed: 'DEGRADED',
-  unknown: 'RUNNING',
 };
 
 let searchTerm = $state('');
@@ -79,8 +70,8 @@ function filterBySearch(models: CatalogModelInfo[], term: string): CatalogModelI
   );
 }
 
-function getModelStatus(model: CatalogModelInfo): string {
-  return statusMap[model.connectionStatus] ?? 'RUNNING';
+function getKey(model: CatalogModelInfo): string {
+  return modelKey(model.providerId, model.label);
 }
 
 function selectModel(model: CatalogModelInfo): void {
@@ -188,58 +179,13 @@ function navigateToModels(): void {
                 <h4 class="text-xs font-semibold text-[var(--pd-content-card-text)] opacity-60 uppercase tracking-wide mb-2">
                   {categoryLabels[category]}
                 </h4>
-                <div class="rounded-md border border-[var(--pd-content-card-border)] overflow-hidden">
-                  <table class="w-full text-sm" aria-label="{categoryLabels[category]} models">
-                    <thead>
-                      <tr class="border-b border-[var(--pd-content-card-border)] bg-[var(--pd-content-card-inset-bg)]">
-                        <th class="w-10 px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Status</th>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Name</th>
-                        <th class="w-20 px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Size</th>
-                        <th class="w-28 px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Runtime</th>
-                        <th class="w-12 px-3 py-2 text-center text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Use</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each models as model (modelKey(model.providerId, model.label))}
-                        {@const key = modelKey(model.providerId, model.label)}
-                        {@const isSelected = selectedModel === key}
-                        <tr
-                          role="button"
-                          tabindex="0"
-                          class="border-b border-[var(--pd-content-card-border)] last:border-b-0 transition-colors
-                            cursor-pointer hover:bg-[var(--pd-content-card-hover-inset-bg)]
-                            {isSelected ? 'bg-[var(--pd-content-card-hover-inset-bg)]' : ''}"
-                          onclick={(): void => selectModel(model)}
-                          onkeydown={(e: KeyboardEvent): void => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              selectModel(model);
-                            }
-                          }}>
-                          <td class="px-3 py-2">
-                            <StatusIcon status={getModelStatus(model)} />
-                          </td>
-                          <td class="px-3 py-2">
-                            <div class="font-medium text-[var(--pd-table-body-text-highlight)]">{model.label}</div>
-                            <div class="text-[11px] text-[var(--pd-content-card-text)] opacity-60">{model.connectionName}</div>
-                          </td>
-                          <td class="px-3 py-2 text-[var(--pd-table-body-text)]">—</td>
-                          <td class="px-3 py-2 text-[var(--pd-table-body-text)]">{model.providerName}</td>
-                          <td class="px-3 py-2 text-center">
-                            <input
-                              type="radio"
-                              name="workspaceModel"
-                              value={key}
-                              checked={isSelected}
-                              aria-label="Use {model.label}"
-                              onclick={(e: MouseEvent): void => e.stopPropagation()}
-                              onchange={(): void => selectModel(model)} />
-                          </td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
+                <ModelSelectionTable
+                  {models}
+                  selectedKey={selectedModel}
+                  radioName="workspaceModel"
+                  heading={categoryLabels[category]}
+                  onselect={selectModel}
+                  modelKey={getKey} />
               </div>
             {/if}
           {/each}

@@ -160,7 +160,7 @@ describe('beforeAdvance callback', () => {
     expect(onboarding.vertexConfig).toEqual({
       projectId: 'my-gcp-project',
       region: 'us-east5',
-      credentialsPath: '/home/user/.config/gcloud',
+      credentialsDir: '/home/user/.config/gcloud',
       mountClaudeConfig: false,
     });
   });
@@ -181,7 +181,7 @@ describe('beforeAdvance callback', () => {
     expect(onboarding.vertexConfig).toEqual({
       projectId: 'my-project',
       region: 'europe-west1',
-      credentialsPath: '/home/user/.config/gcloud',
+      credentialsDir: '/home/user/.config/gcloud',
       mountClaudeConfig: false,
     });
   });
@@ -202,7 +202,7 @@ describe('beforeAdvance callback', () => {
     expect(onboarding.vertexConfig).toEqual({
       projectId: 'my-project',
       region: 'europe-west1',
-      credentialsPath: '/home/user/.config/gcloud',
+      credentialsDir: '/home/user/.config/gcloud',
       mountClaudeConfig: false,
     });
   });

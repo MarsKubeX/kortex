@@ -28,7 +28,7 @@ export type CliAgent = 'opencode' | 'claude' | 'claude-vertex' | 'cursor' | 'goo
 export interface VertexConfig {
   projectId: string;
   region: string;
-  credentialsPath: string;
+  credentialsDir: string;
   mountClaudeConfig?: boolean;
 }
 

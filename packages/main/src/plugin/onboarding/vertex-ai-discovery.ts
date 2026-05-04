@@ -17,6 +17,7 @@
  ***********************************************************************/
 
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { inject, injectable } from 'inversify';
@@ -52,13 +53,13 @@ export class VertexAiDiscovery {
   ) {}
 
   async listModels(request: VertexAiModelListRequest): Promise<VertexAiModelInfo[]> {
-    const credentials = await this.readCredentials(request.credentialsPath);
+    const credentials = await this.readCredentials(request.credentialsDir);
     const accessToken = await this.exchangeToken(credentials);
     return this.fetchModels(request.projectId, request.region, accessToken);
   }
 
   private async readCredentials(credentialsDir: string): Promise<ApplicationDefaultCredentials> {
-    const resolvedDir = credentialsDir.replace(/^~/, process.env['HOME'] ?? '');
+    const resolvedDir = credentialsDir.replace(/^~/, os.homedir());
     const credFile = path.join(resolvedDir, 'application_default_credentials.json');
     const raw = await fs.readFile(credFile, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
@@ -89,6 +90,7 @@ export class VertexAiDiscovery {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {
@@ -108,6 +110,7 @@ export class VertexAiDiscovery {
         Authorization: `Bearer ${accessToken}`,
         'x-goog-user-project': projectId,
       },
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!response.ok) {

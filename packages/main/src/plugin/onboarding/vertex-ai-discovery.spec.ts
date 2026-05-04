@@ -70,7 +70,7 @@ describe('listModels', () => {
     const result = await discovery.listModels({
       projectId: 'my-project',
       region: 'us-east5',
-      credentialsPath: '/home/user/.config/gcloud',
+      credentialsDir: '/home/user/.config/gcloud',
     });
 
     expect(result).toEqual([
@@ -116,7 +116,7 @@ describe('listModels', () => {
       await discovery.listModels({
         projectId: 'p',
         region: 'r',
-        credentialsPath: '~/.config/gcloud',
+        credentialsDir: '~/.config/gcloud',
       });
 
       expect(fs.readFile).toHaveBeenCalledWith(
@@ -124,14 +124,18 @@ describe('listModels', () => {
         'utf-8',
       );
     } finally {
-      process.env['HOME'] = origHome;
+      if (origHome === undefined) {
+        delete process.env['HOME'];
+      } else {
+        process.env['HOME'] = origHome;
+      }
     }
   });
 
   test('throws on missing credential fields', async () => {
     vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify({ client_id: 'only-id' }));
 
-    await expect(discovery.listModels({ projectId: 'p', region: 'r', credentialsPath: '/path' })).rejects.toThrow(
+    await expect(discovery.listModels({ projectId: 'p', region: 'r', credentialsDir: '/path' })).rejects.toThrow(
       /missing required fields/,
     );
   });
@@ -146,7 +150,7 @@ describe('listModels', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(discovery.listModels({ projectId: 'p', region: 'r', credentialsPath: '/path' })).rejects.toThrow(
+    await expect(discovery.listModels({ projectId: 'p', region: 'r', credentialsDir: '/path' })).rejects.toThrow(
       /Failed to exchange token: 401/,
     );
   });
@@ -166,7 +170,7 @@ describe('listModels', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(discovery.listModels({ projectId: 'p', region: 'r', credentialsPath: '/path' })).rejects.toThrow(
+    await expect(discovery.listModels({ projectId: 'p', region: 'r', credentialsDir: '/path' })).rejects.toThrow(
       /Failed to list Vertex AI models: 403/,
     );
   });
@@ -185,7 +189,7 @@ describe('listModels', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await discovery.listModels({ projectId: 'p', region: 'r', credentialsPath: '/path' });
+    const result = await discovery.listModels({ projectId: 'p', region: 'r', credentialsDir: '/path' });
     expect(result).toEqual([]);
   });
 });

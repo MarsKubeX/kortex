@@ -1,8 +1,9 @@
 <script lang="ts">
-import { Spinner, StatusIcon } from '@podman-desktop/ui-svelte';
+import { Spinner } from '@podman-desktop/ui-svelte';
 import { untrack } from 'svelte';
 
 import { type CatalogModelInfo, getCatalogModels } from '/@/lib/models/models-utils';
+import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
 import { providerInfos } from '/@/stores/providers';
 
 import { getAgentDefinition } from './agent-registry';
@@ -16,15 +17,6 @@ const agentToProviders: Record<CliAgent, string[]> = {
   'claude-vertex': ['claude'],
   cursor: [],
   goose: [],
-};
-
-const statusMap: Record<string, string> = {
-  started: 'RUNNING',
-  starting: 'STARTING',
-  stopped: 'CREATED',
-  stopping: 'DELETING',
-  failed: 'DEGRADED',
-  unknown: 'RUNNING',
 };
 
 let agentTitle = $derived(getAgentDefinition(onboarding.agent).title);
@@ -41,18 +33,18 @@ let allModels: CatalogModelInfo[] = $derived(onboarding.agent === 'claude-vertex
 
 $effect(() => {
   if (onboarding.agent === 'claude-vertex' && onboarding.vertexConfig) {
-    const { projectId, region, credentialsPath } = onboarding.vertexConfig;
-    if (projectId && region && credentialsPath) {
-      fetchVertexModels(projectId, region, credentialsPath).catch((e: unknown) => console.error(e));
+    const { projectId, region, credentialsDir } = onboarding.vertexConfig;
+    if (projectId && region && credentialsDir) {
+      fetchVertexModels(projectId, region, credentialsDir).catch((e: unknown) => console.error(e));
     }
   }
 });
 
-async function fetchVertexModels(projectId: string, region: string, credentialsPath: string): Promise<void> {
+async function fetchVertexModels(projectId: string, region: string, credentialsDir: string): Promise<void> {
   vertexLoading = true;
   vertexError = '';
   try {
-    const models = await window.listVertexAiModels({ projectId, region, credentialsPath });
+    const models = await window.listVertexAiModels({ projectId, region, credentialsDir });
     vertexModels = models.map(m => ({
       providerId: 'claude',
       providerName: 'Anthropic (Vertex AI)',
@@ -95,19 +87,20 @@ $effect(() => {
   }
 });
 
-function selectModel(label: string): void {
-  userSelectionLabel = label;
+function selectModel(model: CatalogModelInfo): void {
+  userSelectionLabel = model.label;
 }
 
 function uniqueProviderNames(models: CatalogModelInfo[]): string {
   return [...new Set(models.map(m => m.providerName))].join(' & ');
 }
 
-function mapStatus(connectionStatus: string): string {
-  return statusMap[connectionStatus] ?? 'RUNNING';
+function getModelKey(model: CatalogModelInfo): string {
+  return model.providerId + '/' + model.label;
 }
 
-function statusLabel(connectionStatus: string, type: string): string {
+function statusLabel(model: CatalogModelInfo): string {
+  const { connectionStatus, type } = model;
   if (connectionStatus === 'started') return type === 'local' ? 'loaded in memory' : 'deployed';
   if (connectionStatus === 'stopped') return type === 'local' ? 'not loaded' : 'not deployed';
   if (connectionStatus === 'starting') return 'starting…';
@@ -156,128 +149,23 @@ function statusLabel(connectionStatus: string, type: string): string {
       </div>
     {/if}
 
-    {#if localModels.length > 0}
-      <div class="mb-6" data-testid="local-models-section">
-        <h4 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-          Local · {uniqueProviderNames(localModels)}
-        </h4>
-        <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-bg) overflow-hidden">
-          {#each localModels as model, idx (model.providerId + '/' + model.label)}
-            {#if idx > 0}
-              <div class="mx-3 border-t border-(--pd-content-divider) opacity-30"></div>
-            {/if}
-            <button
-              class="w-full flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors text-left
-                {effectiveModel?.label === model.label
-                  ? 'bg-(--pd-content-card-hover-inset-bg)'
-                  : 'hover:bg-(--pd-content-card-hover-inset-bg)'}"
-              onclick={selectModel.bind(undefined, model.label)}
-              aria-label={model.label}
-              data-testid="model-row-{model.label}">
-              <StatusIcon status={mapStatus(model.connectionStatus)} />
-              <div class="min-w-0 flex-1">
-                <span class="text-[13px] font-medium text-(--pd-table-body-text-highlight)">{model.label}</span>
-                <div class="text-[11px] text-(--pd-table-body-text) mt-0.5">
-                  {model.providerName} · {statusLabel(model.connectionStatus, model.type)}
-                </div>
-              </div>
-              <div class="flex items-center gap-4 shrink-0 text-xs text-(--pd-table-body-text)">
-                <span class="w-20">{model.providerName}</span>
-                <input
-                  type="radio"
-                  name="model-selection"
-                  value={model.label}
-                  checked={effectiveModel?.label === model.label}
-                  aria-label="Use {model.label}"
-                  class="accent-(--pd-button-primary-bg) w-4 h-4 cursor-pointer pointer-events-none" />
-              </div>
-            </button>
-          {/each}
+    {#each [['local', localModels, 'Local · ' + uniqueProviderNames(localModels)] as const, ['self-hosted', selfHostedModels, 'In-house · ' + uniqueProviderNames(selfHostedModels)] as const, ['cloud', cloudModels, 'Cloud · ' + uniqueProviderNames(cloudModels)] as const] as [category, models, heading] (category)}
+      {#if models.length > 0}
+        <div class={category !== 'cloud' ? 'mb-6' : ''} data-testid="{category}-models-section">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
+            {heading}
+          </h4>
+          <ModelSelectionTable
+            {models}
+            selectedKey={effectiveModel ? getModelKey(effectiveModel) : ''}
+            radioName="model-selection"
+            {heading}
+            onselect={selectModel}
+            modelKey={getModelKey}
+            subtitle={statusLabel} />
         </div>
-      </div>
-    {/if}
-
-    {#if selfHostedModels.length > 0}
-      <div class="mb-6" data-testid="self-hosted-models-section">
-        <h4 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-          In-house · {uniqueProviderNames(selfHostedModels)}
-        </h4>
-        <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-bg) overflow-hidden">
-          {#each selfHostedModels as model, idx (model.providerId + '/' + model.label)}
-            {#if idx > 0}
-              <div class="mx-3 border-t border-(--pd-content-divider) opacity-30"></div>
-            {/if}
-            <button
-              class="w-full flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors text-left
-                {effectiveModel?.label === model.label
-                  ? 'bg-(--pd-content-card-hover-inset-bg)'
-                  : 'hover:bg-(--pd-content-card-hover-inset-bg)'}"
-              onclick={selectModel.bind(undefined, model.label)}
-              aria-label={model.label}
-              data-testid="model-row-{model.label}">
-              <StatusIcon status={mapStatus(model.connectionStatus)} />
-              <div class="min-w-0 flex-1">
-                <span class="text-[13px] font-medium text-(--pd-table-body-text-highlight)">{model.label}</span>
-                <div class="text-[11px] text-(--pd-table-body-text) mt-0.5">
-                  {model.providerName} · {statusLabel(model.connectionStatus, model.type)}
-                </div>
-              </div>
-              <div class="flex items-center gap-4 shrink-0 text-xs text-(--pd-table-body-text)">
-                <span class="w-20">{model.providerName}</span>
-                <input
-                  type="radio"
-                  name="model-selection"
-                  value={model.label}
-                  checked={effectiveModel?.label === model.label}
-                  aria-label="Use {model.label}"
-                  class="accent-(--pd-button-primary-bg) w-4 h-4 cursor-pointer pointer-events-none" />
-              </div>
-            </button>
-          {/each}
-        </div>
-      </div>
-    {/if}
-
-    {#if cloudModels.length > 0}
-      <div data-testid="cloud-models-section">
-        <h4 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-          Cloud · {uniqueProviderNames(cloudModels)}
-        </h4>
-        <div class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-bg) overflow-hidden">
-          {#each cloudModels as model, idx (model.providerId + '/' + model.label)}
-            {#if idx > 0}
-              <div class="mx-3 border-t border-(--pd-content-divider) opacity-30"></div>
-            {/if}
-            <button
-              class="w-full flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors text-left
-                {effectiveModel?.label === model.label
-                  ? 'bg-(--pd-content-card-hover-inset-bg)'
-                  : 'hover:bg-(--pd-content-card-hover-inset-bg)'}"
-              onclick={selectModel.bind(undefined, model.label)}
-              aria-label={model.label}
-              data-testid="model-row-{model.label}">
-              <StatusIcon status={mapStatus(model.connectionStatus)} />
-              <div class="min-w-0 flex-1">
-                <span class="text-[13px] font-medium text-(--pd-table-body-text-highlight)">{model.label}</span>
-                <div class="text-[11px] text-(--pd-table-body-text) mt-0.5">
-                  {model.providerName}
-                </div>
-              </div>
-              <div class="flex items-center gap-4 shrink-0 text-xs text-(--pd-table-body-text)">
-                <span class="w-20">{model.providerName}</span>
-                <input
-                  type="radio"
-                  name="model-selection"
-                  value={model.label}
-                  checked={effectiveModel?.label === model.label}
-                  aria-label="Use {model.label}"
-                  class="accent-(--pd-button-primary-bg) w-4 h-4 cursor-pointer pointer-events-none" />
-              </div>
-            </button>
-          {/each}
-        </div>
-      </div>
-    {/if}
+      {/if}
+    {/each}
   </div>
 
   {#if effectiveModel}

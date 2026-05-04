@@ -52,8 +52,8 @@ function buildWorkspaceConfig(): { environment: WorkspaceEnvVar[]; mounts: Works
   }
 
   if (agent === 'claude-vertex' && onboardingState.vertexConfig) {
-    const { projectId, region, credentialsPath, mountClaudeConfig } = onboardingState.vertexConfig;
-    const mounts: WorkspaceMount[] = [{ host: credentialsPath, target: '$HOME/.config/gcloud', ro: true }];
+    const { projectId, region, credentialsDir, mountClaudeConfig } = onboardingState.vertexConfig;
+    const mounts: WorkspaceMount[] = [{ host: credentialsDir, target: '$HOME/.config/gcloud', ro: true }];
     if (mountClaudeConfig) {
       mounts.push({ host: '$HOME/.claude', target: '$HOME/.claude', ro: true });
       mounts.push({ host: '$HOME/.claude.json', target: '$HOME/.claude.json', ro: true });

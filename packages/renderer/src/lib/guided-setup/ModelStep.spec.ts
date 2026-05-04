@@ -155,12 +155,14 @@ describe('local models', () => {
     expect(screen.getByText(/Local · Ollama & Ramalama/)).toBeInTheDocument();
   });
 
-  test('shows provider name and status in model subtitle', () => {
+  test('shows status label in subtitle and provider in Runtime column', () => {
     setProviders([ollamaProvider('qwen3-code')]);
 
     renderStep();
 
-    expect(screen.getByText(/Ollama · loaded in memory/)).toBeInTheDocument();
+    expect(screen.getByText(/loaded in memory/)).toBeInTheDocument();
+    const runtimeCells = screen.getAllByText('Ollama');
+    expect(runtimeCells.length).toBeGreaterThanOrEqual(1);
   });
 
   test('auto-selects the first model', async () => {
@@ -346,7 +348,7 @@ describe('vertex AI models', () => {
 
     renderStep({
       agent: 'claude-vertex',
-      vertexConfig: { projectId: 'my-proj', region: 'us-east5', credentialsPath: '/gcloud' },
+      vertexConfig: { projectId: 'my-proj', region: 'us-east5', credentialsDir: '/gcloud' },
     });
 
     await waitFor(() => {
@@ -357,7 +359,7 @@ describe('vertex AI models', () => {
     expect(window.listVertexAiModels).toHaveBeenCalledWith({
       projectId: 'my-proj',
       region: 'us-east5',
-      credentialsPath: '/gcloud',
+      credentialsDir: '/gcloud',
     });
   });
 
@@ -370,7 +372,7 @@ describe('vertex AI models', () => {
 
     renderStep({
       agent: 'claude-vertex',
-      vertexConfig: { projectId: 'p', region: 'r', credentialsPath: '/c' },
+      vertexConfig: { projectId: 'p', region: 'r', credentialsDir: '/c' },
     });
 
     await waitFor(() => {
@@ -386,7 +388,7 @@ describe('vertex AI models', () => {
 
     renderStep({
       agent: 'claude-vertex',
-      vertexConfig: { projectId: 'p', region: 'r', credentialsPath: '/c' },
+      vertexConfig: { projectId: 'p', region: 'r', credentialsDir: '/c' },
     });
 
     await waitFor(() => {
@@ -401,7 +403,7 @@ describe('vertex AI models', () => {
 
     renderStep({
       agent: 'claude-vertex',
-      vertexConfig: { projectId: 'p', region: 'r', credentialsPath: '/c' },
+      vertexConfig: { projectId: 'p', region: 'r', credentialsDir: '/c' },
     });
 
     await waitFor(() => {
@@ -413,7 +415,7 @@ describe('vertex AI models', () => {
   test('does not fetch vertex models when config is incomplete', () => {
     renderStep({
       agent: 'claude-vertex',
-      vertexConfig: { projectId: '', region: 'us-east5', credentialsPath: '/c' },
+      vertexConfig: { projectId: '', region: 'us-east5', credentialsDir: '/c' },
     });
 
     expect(window.listVertexAiModels).not.toHaveBeenCalled();
@@ -426,7 +428,7 @@ describe('vertex AI models', () => {
 
     renderStep({
       agent: 'claude-vertex',
-      vertexConfig: { projectId: 'p', region: 'r', credentialsPath: '/c' },
+      vertexConfig: { projectId: 'p', region: 'r', credentialsDir: '/c' },
     });
 
     await waitFor(() => {

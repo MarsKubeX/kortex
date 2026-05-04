@@ -19,7 +19,7 @@
 export interface VertexAiModelListRequest {
   projectId: string;
   region: string;
-  credentialsPath: string;
+  credentialsDir: string;
 }
 
 export interface VertexAiModelInfo {
