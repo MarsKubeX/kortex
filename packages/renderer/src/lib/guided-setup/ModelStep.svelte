@@ -28,6 +28,7 @@ let providerModels: CatalogModelInfo[] = $derived(
 let vertexModels: CatalogModelInfo[] = $state([]);
 let vertexLoading = $state(false);
 let vertexError = $state('');
+let fetchSeq = 0;
 
 let allModels: CatalogModelInfo[] = $derived(onboarding.agent === 'claude-vertex' ? vertexModels : providerModels);
 
@@ -41,10 +42,13 @@ $effect(() => {
 });
 
 async function fetchVertexModels(projectId: string, region: string, credentialsDir: string): Promise<void> {
+  const seq = ++fetchSeq;
   vertexLoading = true;
   vertexError = '';
+  vertexModels = [];
   try {
     const models = await window.listVertexAiModels({ projectId, region, credentialsDir });
+    if (seq !== fetchSeq) return;
     vertexModels = models.map(m => ({
       providerId: 'claude',
       providerName: 'Anthropic (Vertex AI)',
@@ -54,10 +58,11 @@ async function fetchVertexModels(projectId: string, region: string, credentialsD
       connectionStatus: 'started' as const,
     }));
   } catch (err: unknown) {
+    if (seq !== fetchSeq) return;
     vertexError = err instanceof Error ? err.message : String(err);
     vertexModels = [];
   } finally {
-    vertexLoading = false;
+    if (seq === fetchSeq) vertexLoading = false;
   }
 }
 

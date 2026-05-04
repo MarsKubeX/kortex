@@ -20,7 +20,7 @@ const defaultStatusMap: Record<string, string> = {
   stopped: 'CREATED',
   stopping: 'DELETING',
   failed: 'DEGRADED',
-  unknown: 'RUNNING',
+  unknown: 'DEGRADED',
 };
 
 let {
@@ -43,7 +43,7 @@ function handleKeydown(e: KeyboardEvent, model: CatalogModelInfo): void {
 </script>
 
 <div class="rounded-md border border-(--pd-content-divider) overflow-hidden">
-  <table class="w-full text-sm" aria-label="{heading} models">
+  <table role="grid" class="w-full text-sm" aria-label="{heading} models">
     <thead>
       <tr class="border-b border-(--pd-content-divider) bg-(--pd-content-card-inset-bg)">
         <th class="w-10 px-3 py-2 text-left text-xs font-medium text-(--pd-content-card-text) opacity-60">Status</th>
@@ -65,7 +65,7 @@ function handleKeydown(e: KeyboardEvent, model: CatalogModelInfo): void {
             {isSelected ? 'bg-(--pd-content-card-hover-inset-bg)' : ''}"
           onclick={onselect.bind(undefined, model)}
           onkeydown={(e: KeyboardEvent): void => handleKeydown(e, model)}
-          data-testid="model-row-{model.label}">
+          data-testid="model-row-{getKey(model)}">
           <td class="px-3 py-2">
             <StatusIcon status={statusMapper(model.connectionStatus)} />
           </td>

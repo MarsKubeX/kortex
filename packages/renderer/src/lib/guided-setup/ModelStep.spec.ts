@@ -192,7 +192,7 @@ describe('model selection', () => {
 
     renderStep();
 
-    const row = screen.getByTestId('model-row-llama3.2:3b');
+    const row = screen.getByTestId('model-row-ollama/llama3.2:3b');
     await fireEvent.click(row);
 
     await waitFor(() => {
@@ -205,7 +205,7 @@ describe('model selection', () => {
 
     renderStep();
 
-    const row = screen.getByTestId('model-row-llama3.2:3b');
+    const row = screen.getByTestId('model-row-ollama/llama3.2:3b');
     await fireEvent.click(row);
 
     await waitFor(() => {
@@ -261,7 +261,7 @@ describe('self-hosted models', () => {
 
     renderStep();
 
-    const row = screen.getByTestId('model-row-granite-model');
+    const row = screen.getByTestId('model-row-openshiftai/granite-model');
     await fireEvent.click(row);
 
     await waitFor(() => {
