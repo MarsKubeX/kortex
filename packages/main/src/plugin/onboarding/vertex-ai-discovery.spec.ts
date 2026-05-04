@@ -17,6 +17,8 @@
  ***********************************************************************/
 
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -25,6 +27,7 @@ import type { IPCHandle } from '/@/plugin/api.js';
 import { VertexAiDiscovery } from './vertex-ai-discovery.js';
 
 vi.mock(import('node:fs/promises'));
+vi.mock(import('node:os'));
 
 const ipcHandle: IPCHandle = vi.fn();
 
@@ -39,6 +42,7 @@ const validCredentials = JSON.stringify({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(os.homedir).mockReturnValue('/home/testuser');
   discovery = new VertexAiDiscovery(ipcHandle);
 });
 
@@ -78,7 +82,10 @@ describe('listModels', () => {
       { name: 'claude-3-5-haiku-20241022', displayName: 'claude-3-5-haiku-20241022' },
     ]);
 
-    expect(fs.readFile).toHaveBeenCalledWith('/home/user/.config/gcloud/application_default_credentials.json', 'utf-8');
+    expect(fs.readFile).toHaveBeenCalledWith(
+      path.join('/home/user/.config/gcloud', 'application_default_credentials.json'),
+      'utf-8',
+    );
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://oauth2.googleapis.com/token',
@@ -97,6 +104,7 @@ describe('listModels', () => {
 
   test('expands tilde in credentials path', async () => {
     vi.mocked(fs.readFile).mockResolvedValue(validCredentials);
+    vi.mocked(os.homedir).mockReturnValue('/home/testuser');
 
     const fetchMock = vi.fn();
     fetchMock.mockResolvedValueOnce({
@@ -109,27 +117,16 @@ describe('listModels', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const origHome = process.env['HOME'];
-    process.env['HOME'] = '/home/testuser';
+    await discovery.listModels({
+      projectId: 'p',
+      region: 'r',
+      credentialsDir: '~/.config/gcloud',
+    });
 
-    try {
-      await discovery.listModels({
-        projectId: 'p',
-        region: 'r',
-        credentialsDir: '~/.config/gcloud',
-      });
-
-      expect(fs.readFile).toHaveBeenCalledWith(
-        '/home/testuser/.config/gcloud/application_default_credentials.json',
-        'utf-8',
-      );
-    } finally {
-      if (origHome === undefined) {
-        delete process.env['HOME'];
-      } else {
-        process.env['HOME'] = origHome;
-      }
-    }
+    expect(fs.readFile).toHaveBeenCalledWith(
+      path.join('/home/testuser/.config/gcloud', 'application_default_credentials.json'),
+      'utf-8',
+    );
   });
 
   test('throws on missing credential fields', async () => {
