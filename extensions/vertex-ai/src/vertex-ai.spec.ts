@@ -172,7 +172,16 @@ describe('readCredentials', () => {
     );
   });
 
-  test('should throw on invalid credentials', async () => {
+  test('should reject service-account credentials with clear error', async () => {
+    vi.mocked(readFile).mockResolvedValue(
+      JSON.stringify({ type: 'service_account', project_id: 'my-project', private_key: 'key' }),
+    );
+
+    const vertexAi = createVertexAi();
+    await expect(vertexAi.readCredentials('/some/dir')).rejects.toThrow('Unsupported ADC type "service_account"');
+  });
+
+  test('should throw on missing required fields', async () => {
     vi.mocked(readFile).mockResolvedValue(JSON.stringify({ type: 'authorized_user' }));
 
     const vertexAi = createVertexAi();
@@ -370,6 +379,23 @@ describe('factory', () => {
     ).rejects.toThrow('Region "bad-region" not found');
   });
 
+  test('should rollback saved config if registration fails', async () => {
+    vi.mocked(PROVIDER_MOCK.registerInferenceProviderConnection).mockImplementation(() => {
+      throw new Error('registration boom');
+    });
+
+    await expect(
+      create({
+        'vertex-ai.factory.projectId': 'my-project',
+        'vertex-ai.factory.region': 'us-east5',
+        'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+      }),
+    ).rejects.toThrow('registration boom');
+
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledTimes(2);
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenNthCalledWith(2, CONNECTIONS_KEY, '[]');
+  });
+
   test('should save config and register connection', async () => {
     await create({
       'vertex-ai.factory.projectId': 'my-project',
@@ -383,7 +409,7 @@ describe('factory', () => {
       expect.objectContaining({
         name: 'my-project (us-east5)',
         type: 'cloud',
-        llmMetadata: { name: 'anthropic' },
+        llmMetadata: { name: 'anthropic-vertex' },
         sdk: VERTEX_ANTHROPIC_MOCK,
         models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-haiku-3.5-20241022' }],
       }),
