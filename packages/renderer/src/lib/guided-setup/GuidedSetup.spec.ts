@@ -130,7 +130,7 @@ test('completed steps are tracked after Continue', async () => {
   expect(firstStepButton).toBeEnabled();
 });
 
-test('skipped steps close immediately without changing stepper state', async () => {
+test('Skip closes the wizard immediately', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   const skipButton = screen.getByRole('button', { name: 'Skip' });

@@ -149,7 +149,7 @@ describe('opencode agent models', () => {
     });
   });
 
-  test('does not show claude models for opencode agent', () => {
+  test('shows all available models for opencode agent', () => {
     stubProviders(MIXED_PROVIDERS);
     renderStep({ agent: 'opencode' });
 
