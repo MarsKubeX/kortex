@@ -17,21 +17,31 @@
  ***********************************************************************/
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
-import { faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faCube, faRobot } from '@fortawesome/free-solid-svg-icons';
 import type { Component } from 'svelte';
 
 import CodingAgentStep from './CodingAgentStep.svelte';
+import ModelStep from './ModelStep.svelte';
 
 export type CliAgent = 'opencode' | 'claude' | 'claude-vertex' | 'cursor' | 'goose';
 
+// TODO: Remove VertexConfig once the Vertex AI extension is added and handles its own config.
 export interface VertexConfig {
   projectId: string;
   region: string;
   credentialsPath: string;
+  mountClaudeConfig?: boolean;
+}
+
+export interface OnboardingModelSelection {
+  providerId: string;
+  label: string;
 }
 
 export interface OnboardingState {
   agent: CliAgent;
+  secretName?: string;
+  model?: OnboardingModelSelection;
   vertexConfig?: VertexConfig;
   beforeAdvance?: () => Promise<boolean>;
 }
@@ -62,11 +72,20 @@ export function createDefaultOnboardingState(): OnboardingState {
 export const guidedSetupSteps: GuidedSetupStep[] = [
   {
     id: 'coding-agent',
-    title: 'Choose your coding agent',
+    title: 'Coding agent',
     description:
       'Pick the default coding agent runtime. The API notes below update for your choice. You can change this later in settings.',
     icon: faRobot,
     component: CodingAgentStep,
+    isComplete: (): boolean => false,
+    isSkippable: true,
+  },
+  {
+    id: 'model-selection',
+    title: 'Model',
+    description: 'Select the default model for your coding agent.',
+    icon: faCube,
+    component: ModelStep,
     isComplete: (): boolean => false,
     isSkippable: true,
   },

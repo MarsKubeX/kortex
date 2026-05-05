@@ -22,8 +22,11 @@ import { faBrain, faCheckCircle, faRobot } from '@fortawesome/free-solid-svg-ico
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, expect, test, vi } from 'vitest';
 
+import { getAgentDefinition } from './agent-registry';
 import type { GuidedSetupStep, OnboardingState } from './guided-setup-steps';
 import GuidedSetup from './GuidedSetup.svelte';
+
+vi.mock(import('./agent-registry'));
 
 vi.mock(import('./guided-setup-steps'), async importOriginal => {
   const orig = await importOriginal();
@@ -69,6 +72,9 @@ const closeMock = vi.fn();
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
+  vi.mocked(getAgentDefinition).mockReturnValue({ cliName: 'opencode', title: 'OpenCode' } as ReturnType<
+    typeof getAgentDefinition
+  >);
   vi.stubGlobal('updateConfigurationValue', vi.fn().mockResolvedValue(undefined));
 });
 
@@ -103,14 +109,14 @@ test('"Continue" advances to next step', async () => {
   expect(secondStepButton).toHaveAttribute('aria-current', 'step');
 });
 
-test('"Skip" advances to next step', async () => {
+test('"Skip" closes the wizard without persisting', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   const skipButton = screen.getByRole('button', { name: 'Skip' });
   await fireEvent.click(skipButton);
 
-  const secondStepButton = screen.getByRole('button', { name: 'Step B step' });
-  expect(secondStepButton).toHaveAttribute('aria-current', 'step');
+  expect(closeMock).toHaveBeenCalled();
+  expect(window.updateConfigurationValue).not.toHaveBeenCalled();
 });
 
 test('completed steps are tracked after Continue', async () => {
@@ -124,14 +130,13 @@ test('completed steps are tracked after Continue', async () => {
   expect(firstStepButton).toBeEnabled();
 });
 
-test('skipped steps are not marked completed', async () => {
+test('skipped steps close immediately without changing stepper state', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   const skipButton = screen.getByRole('button', { name: 'Skip' });
   await fireEvent.click(skipButton);
 
-  const firstStepButton = screen.getByRole('button', { name: 'Step A step' });
-  expect(firstStepButton).toBeDisabled();
+  expect(closeMock).toHaveBeenCalled();
 });
 
 test('last step shows "Go to Dashboard" instead of "Continue"', async () => {
@@ -208,16 +213,13 @@ test('persists default agent to settings.json when wizard completes', async () =
   });
 });
 
-test('persists defaults when skipping to the end', async () => {
+test('Skip closes without persisting any settings', async () => {
   render(GuidedSetup, { onclose: closeMock });
 
   await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-  await fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
-  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
 
-  await waitFor(() => {
-    expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultAgent', 'opencode');
-  });
+  expect(closeMock).toHaveBeenCalled();
+  expect(window.updateConfigurationValue).not.toHaveBeenCalled();
 });
 
 test('closes wizard even when persistence fails', async () => {
@@ -243,4 +245,56 @@ test('does not persist defaults when advancing to intermediate steps', async () 
   await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
 
   expect(window.updateConfigurationValue).not.toHaveBeenCalled();
+});
+
+test('Back button is not shown on the first step', () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+});
+
+test('Back button appears after advancing to step 2', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+
+  expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+});
+
+test('Back button navigates to the previous step', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+
+  const secondStepButton = screen.getByRole('button', { name: 'Step B step' });
+  expect(secondStepButton).toHaveAttribute('aria-current', 'step');
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+  const firstStepButton = screen.getByRole('button', { name: 'Step A step' });
+  expect(firstStepButton).toHaveAttribute('aria-current', 'step');
+});
+
+test('Back button is hidden again after going back to the first step', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+
+  await fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+  expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+});
+
+test('persists defaultWorkspaceSettings with workspaceConfig when wizard completes', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+
+  await waitFor(() => {
+    expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultWorkspaceSettings', {
+      workspaceConfig: { environment: [] },
+    });
+  });
 });

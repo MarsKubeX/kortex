@@ -1,5 +1,5 @@
 <script lang="ts">
-import { faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faCircleCheck, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { ErrorMessage, Input } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 
@@ -28,7 +28,23 @@ let errorMessage = $state('');
 
 let claudeProvider = $derived($providerInfos.find(p => p.id === providerId));
 
+let existingConnection = $derived(claudeProvider?.inferenceConnections?.find(c => c.models.length > 0));
+let alreadyConnected = $derived(!!existingConnection);
+
+$effect(() => {
+  if (alreadyConnected && onboarding) {
+    onboarding.secretName = secretType;
+  }
+});
+
 async function validate(): Promise<boolean> {
+  if (alreadyConnected) {
+    if (onboarding) {
+      onboarding.secretName = secretType;
+    }
+    return true;
+  }
+
   errorMessage = '';
 
   if (!claudeProvider) {
@@ -68,6 +84,10 @@ async function validate(): Promise<boolean> {
     );
 
     await fetchProviders();
+
+    if (onboarding) {
+      onboarding.secretName = secretType;
+    }
     return true;
   } catch (err: unknown) {
     errorMessage = err instanceof Error ? err.message : String(err);
@@ -90,33 +110,50 @@ $effect(() => {
 <div
   class="rounded-xl border border-(--pd-content-divider) bg-(--pd-content-card-inset-bg) p-6"
   data-testid="claude-panel">
-  <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
-    API Key
-  </h3>
-  <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-4 leading-relaxed">
-    Enter your Anthropic API key. It will be verified and stored when you continue to the next step.
-  </p>
 
-  <div class="flex flex-col gap-3" data-testid="claude-form">
-    {#if !claudeProvider}
-      <div
-        class="flex items-center gap-2 rounded-lg bg-(--pd-content-card-bg) border border-(--pd-state-warning) p-3"
-        role="alert"
-        data-testid="claude-provider-missing">
-        <Icon icon={faTriangleExclamation} size="sm" class="text-(--pd-state-warning) shrink-0" />
-        <span class="text-xs text-(--pd-state-warning)">Claude provider extension not detected.</span>
+  {#if alreadyConnected}
+    <div
+      class="flex items-center gap-3 rounded-lg bg-(--pd-content-card-bg) border border-(--pd-state-success) p-4"
+      role="status"
+      aria-live="polite"
+      data-testid="claude-already-connected">
+      <Icon icon={faCircleCheck} size="lg" class="text-(--pd-state-success)" />
+      <div>
+        <strong class="text-sm text-(--pd-state-success)">Connection configured</strong>
+        <p class="text-xs text-(--pd-content-card-text) opacity-70 mt-0.5">
+          {existingConnection?.models.length} model{existingConnection?.models.length !== 1 ? 's' : ''} available. You can continue to the next step.
+        </p>
       </div>
-    {/if}
+    </div>
+  {:else}
+    <h3 class="text-xs font-bold uppercase tracking-wider text-(--pd-content-card-text) opacity-50 mb-3">
+      API Key
+    </h3>
+    <p class="text-xs text-(--pd-content-card-text) opacity-50 mb-4 leading-relaxed">
+      Enter your Anthropic API key. It will be verified and stored when you continue to the next step.
+    </p>
 
-    <Input
-      type="password"
-      placeholder="sk-ant-..."
-      bind:value={apiKey}
-      aria-label="Anthropic API key"
-      disabled={!claudeProvider} />
+    <div class="flex flex-col gap-3" data-testid="claude-form">
+      {#if !claudeProvider}
+        <div
+          class="flex items-center gap-2 rounded-lg bg-(--pd-content-card-bg) border border-(--pd-state-warning) p-3"
+          role="alert"
+          data-testid="claude-provider-missing">
+          <Icon icon={faTriangleExclamation} size="sm" class="text-(--pd-state-warning) shrink-0" />
+          <span class="text-xs text-(--pd-state-warning)">Claude provider extension not detected.</span>
+        </div>
+      {/if}
 
-    {#if errorMessage}
-      <ErrorMessage error={errorMessage} />
-    {/if}
-  </div>
+      <Input
+        type="password"
+        placeholder="sk-ant-..."
+        bind:value={apiKey}
+        aria-label="Anthropic API key"
+        disabled={!claudeProvider} />
+
+      {#if errorMessage}
+        <ErrorMessage error={errorMessage} />
+      {/if}
+    </div>
+  {/if}
 </div>
