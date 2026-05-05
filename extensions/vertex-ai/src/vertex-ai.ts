@@ -157,6 +157,13 @@ export class VertexAi implements Disposable {
     const content = await readFile(credFile, 'utf-8');
     const creds = JSON.parse(content) as AdcCredentials;
 
+    if (creds.type !== 'authorized_user') {
+      throw new Error(
+        `Unsupported ADC type "${creds.type}" in ${credFile}: expected "authorized_user". ` +
+          'Run "gcloud auth application-default login" to generate user credentials.',
+      );
+    }
+
     if (!creds.client_id || !creds.client_secret || !creds.refresh_token) {
       throw new Error(`Invalid ADC credentials in ${credFile}: missing required fields`);
     }
@@ -294,7 +301,7 @@ export class VertexAi implements Disposable {
       name: `${config.projectId} (${config.region})`,
       type: 'cloud',
       llmMetadata: {
-        name: 'anthropic',
+        name: 'anthropic-vertex',
       },
       sdk: vertexAnthropic,
       status(): ProviderConnectionStatus {
@@ -371,7 +378,12 @@ export class VertexAi implements Disposable {
     const models = await this.validateConnection(config);
 
     await this.saveConnectionConfig(config);
-    await this.registerInferenceProviderConnection(config, models);
+    try {
+      await this.registerInferenceProviderConnection(config, models);
+    } catch (err) {
+      await this.removeConnectionConfig(config);
+      throw err;
+    }
   }
 
   dispose(): void {

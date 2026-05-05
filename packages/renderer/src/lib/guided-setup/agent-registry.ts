@@ -17,18 +17,19 @@
  ***********************************************************************/
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
-import { faClaude } from '@fortawesome/free-brands-svg-icons';
+import { faClaude, faGoogle } from '@fortawesome/free-brands-svg-icons';
 import { faCode, faDesktop, faRobot, faWrench } from '@fortawesome/free-solid-svg-icons';
 import type { Component } from 'svelte';
 
-import ClaudeVertexPanel from '/@/lib/guided-setup/panels/ClaudeVertexPanel.svelte';
 import ClaudeCodeIcon from '/@/lib/images/agents/ClaudeCodeIcon.svelte';
 import CursorIcon from '/@/lib/images/agents/CursorIcon.svelte';
 import GooseIcon from '/@/lib/images/agents/GooseIcon.svelte';
 import OpenCodeIcon from '/@/lib/images/agents/OpenCodeIcon.svelte';
+import VertexAIIcon from '/@/lib/images/agents/VertexAIIcon.svelte';
 
 import type { CliAgent } from './guided-setup-steps';
 import ClaudePanel from './panels/ClaudePanel.svelte';
+import ClaudeVertexPanel from './panels/ClaudeVertexPanel.svelte';
 import OpenCodePanel from './panels/OpenCodePanel.svelte';
 
 export interface AgentDefinition {
@@ -90,11 +91,12 @@ export const agentDefinitions: AgentDefinition[] = [
     cliName: 'claude-vertex',
     cliAgent: 'claude',
     title: 'Claude on Vertex AI',
-    description: 'Use Claude models through Google Cloud Vertex AI with application default credentials.',
-    icon: faClaude,
-    iconComponent: ClaudeCodeIcon,
-    colorClass: 'bg-gradient-to-br from-amber-600 to-amber-500',
-    modelFilter: 'anthropic',
+    description: 'Run Claude Code through Google Cloud Vertex AI using your GCP project credentials.',
+    badge: 'Vertex AI',
+    icon: faGoogle,
+    iconComponent: VertexAIIcon,
+    colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600',
+    modelFilter: 'anthropic-vertex',
     panel: ClaudeVertexPanel,
     runtimes: ['podman'],
   },
