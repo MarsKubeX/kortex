@@ -33,9 +33,7 @@ let selectedAgentLabel: string = $derived(
   agentDefinitions.find(a => a.cliName === selectedAgent)?.title ?? 'the selected agent',
 );
 
-let selectedKey: string = $derived(
-  selectedModel ? modelKey(selectedModel.providerId, selectedModel.label) : '',
-);
+let selectedKey: string = $derived(selectedModel ? modelKey(selectedModel.providerId, selectedModel.label) : '');
 
 function filterByAgent(models: CatalogModelInfo[], agent: string): CatalogModelInfo[] {
   if (!agent) return models;
