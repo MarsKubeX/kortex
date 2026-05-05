@@ -1,0 +1,56 @@
+{
+  "name": "vertex-ai",
+  "displayName": "Vertex AI",
+  "description": "Integration for Google Cloud Vertex AI (Anthropic models)",
+  "version": "0.0.1-next",
+  "icon": "icon.png",
+  "publisher": "kaiden",
+  "license": "Apache-2.0",
+  "engines": {
+    "kaiden": "^0.0.1"
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Vertex AI",
+      "properties": {
+        "vertex-ai.factory._description": {
+          "type": "markdown",
+          "scope": "InferenceProviderConnectionFactory",
+          "markdownDescription": "Connect to Anthropic models on Google Cloud Vertex AI.\n\nRun `gcloud auth application-default login` on the host first.\n\n:button[Vertex AI docs]{href=\"https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/use-claude\"}"
+        },
+        "vertex-ai.factory.projectId": {
+          "type": "string",
+          "scope": "InferenceProviderConnectionFactory",
+          "description": "Google Cloud project ID"
+        },
+        "vertex-ai.factory.region": {
+          "type": "string",
+          "scope": "InferenceProviderConnectionFactory",
+          "description": "Google Cloud region (e.g. us-east5, europe-west1)"
+        },
+        "vertex-ai.factory.credentialsDir": {
+          "type": "string",
+          "scope": "InferenceProviderConnectionFactory",
+          "description": "Path to gcloud credentials directory (contains application_default_credentials.json)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "vite build && node ./scripts/build.js",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest watch --coverage",
+    "watch": "vite build --watch"
+  },
+  "dependencies": {
+    "@ai-sdk/google-vertex": "^4.0.98",
+    "@openkaiden/api": "workspace:*"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.5.16",
+    "mkdirp": "^3.0.1",
+    "vite": "^7.1.2",
+    "vitest": "^4.0.10"
+  }
+}

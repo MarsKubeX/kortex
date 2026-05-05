@@ -1,0 +1,384 @@
+/**********************************************************************
+ * Copyright (C) 2026 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ ***********************************************************************/
+
+import { createHash } from 'node:crypto';
+import { access, readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+import { createVertexAnthropic } from '@ai-sdk/google-vertex/anthropic';
+import type {
+  Disposable,
+  InferenceModel,
+  Provider,
+  provider as ProviderAPI,
+  ProviderConnectionStatus,
+  SecretStorage,
+} from '@openkaiden/api';
+
+export const CONNECTIONS_KEY = 'vertex-ai:connections';
+const FETCH_TIMEOUT_MS = 30_000;
+const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+const ADC_FILENAME = 'application_default_credentials.json';
+
+export interface VertexAiConnectionConfig {
+  projectId: string;
+  region: string;
+  credentialsDir: string;
+}
+
+interface AdcCredentials {
+  client_id: string;
+  client_secret: string;
+  refresh_token: string;
+  type: string;
+}
+
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+interface VertexPublisherModel {
+  name: string;
+  displayName?: string;
+}
+
+interface VertexModelsResponse {
+  publisherModels?: VertexPublisherModel[];
+}
+
+interface GoogleCloudError {
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+}
+
+export class VertexAi implements Disposable {
+  private provider: Provider | undefined;
+  private connections: Map<string, Disposable> = new Map();
+
+  constructor(
+    private readonly providerAPI: typeof ProviderAPI,
+    private readonly secrets: SecretStorage,
+  ) {}
+
+  async init(): Promise<void> {
+    this.provider = this.providerAPI.createProvider({
+      name: 'Vertex AI',
+      status: 'unknown',
+      id: 'vertex-ai',
+      images: {
+        icon: './icon.png',
+        logo: {
+          dark: './icon.png',
+          light: './icon.png',
+        },
+      },
+    });
+
+    this.provider?.setInferenceProviderConnectionFactory({ create: this.factory.bind(this) });
+
+    await this.restoreConnections();
+  }
+
+  private async restoreConnections(): Promise<void> {
+    const configs = await this.getConnectionConfigs();
+    for (const config of configs) {
+      try {
+        await this.registerInferenceProviderConnection(config);
+      } catch (err: unknown) {
+        console.error(`Vertex AI: failed to restore connection for project ${config.projectId}`, err);
+      }
+    }
+  }
+
+  private async getConnectionConfigs(): Promise<VertexAiConnectionConfig[]> {
+    let raw: string | undefined;
+    try {
+      raw = await this.secrets.get(CONNECTIONS_KEY);
+    } catch (err: unknown) {
+      console.error('Vertex AI: failed to read connections from secret storage', err);
+    }
+    if (!raw) return [];
+    try {
+      return JSON.parse(raw) as VertexAiConnectionConfig[];
+    } catch {
+      return [];
+    }
+  }
+
+  private async saveConnectionConfig(config: VertexAiConnectionConfig): Promise<void> {
+    const configs = await this.getConnectionConfigs();
+    configs.push(config);
+    await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(configs));
+  }
+
+  private async removeConnectionConfig(config: VertexAiConnectionConfig): Promise<void> {
+    const configs = await this.getConnectionConfigs();
+    const key = this.getConfigHash(config);
+    const filtered = configs.filter(c => this.getConfigHash(c) !== key);
+    await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(filtered));
+  }
+
+  private getConfigHash(config: VertexAiConnectionConfig): string {
+    const sha256 = createHash('sha256');
+    return sha256.update(`${config.projectId}:${config.region}:${config.credentialsDir}`).digest('hex');
+  }
+
+  private resolveCredentialsDir(credentialsDir: string): string {
+    if (credentialsDir.startsWith('~')) {
+      return join(homedir(), credentialsDir.slice(1));
+    }
+    return credentialsDir;
+  }
+
+  async readCredentials(credentialsDir: string): Promise<AdcCredentials> {
+    const resolvedDir = this.resolveCredentialsDir(credentialsDir);
+    const credFile = join(resolvedDir, ADC_FILENAME);
+    const content = await readFile(credFile, 'utf-8');
+    const creds = JSON.parse(content) as AdcCredentials;
+
+    if (!creds.client_id || !creds.client_secret || !creds.refresh_token) {
+      throw new Error(`Invalid ADC credentials in ${credFile}: missing required fields`);
+    }
+
+    return creds;
+  }
+
+  async exchangeToken(creds: AdcCredentials): Promise<string> {
+    const body = new URLSearchParams({
+      client_id: creds.client_id,
+      client_secret: creds.client_secret,
+      refresh_token: creds.refresh_token,
+      grant_type: 'refresh_token',
+    });
+
+    const response = await fetch(TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Token exchange failed: ${response.status} ${response.statusText}`);
+    }
+
+    const tokenData = (await response.json()) as TokenResponse;
+    return tokenData.access_token;
+  }
+
+  async fetchModels(projectId: string, region: string, accessToken: string): Promise<InferenceModel[]> {
+    const url = `https://${region}-aiplatform.googleapis.com/v1beta1/publishers/anthropic/models`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'x-goog-user-project': projectId,
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.parseGoogleCloudError(response, projectId, region));
+    }
+
+    const data = (await response.json()) as VertexModelsResponse;
+    return (data.publisherModels ?? [])
+      .filter(m => m.name)
+      .map(m => ({
+        label: m.name.split('/').pop() ?? m.name,
+      }));
+  }
+
+  private async parseGoogleCloudError(response: Response, projectId: string, region: string): Promise<string> {
+    let serverMessage: string | undefined;
+    try {
+      const body = (await response.json()) as GoogleCloudError;
+      serverMessage = body.error?.message;
+    } catch {
+      // response body is not JSON
+    }
+
+    switch (response.status) {
+      case 400:
+        return serverMessage ?? `Bad request — check that project "${projectId}" and region "${region}" are valid`;
+      case 401:
+        return 'Authentication expired — try running "gcloud auth application-default login" again';
+      case 403:
+        return (
+          serverMessage ??
+          `Access denied for project "${projectId}". Verify the Vertex AI API is enabled and your account has the required permissions`
+        );
+      case 404:
+        return `Region "${region}" not found — verify it supports Anthropic models on Vertex AI`;
+      default:
+        return serverMessage ?? `Unexpected error: ${response.status} ${response.statusText}`;
+    }
+  }
+
+  /**
+   * Registers a connection using pre-validated models (factory path)
+   * or by fetching them fresh with graceful degradation (restore path).
+   */
+  private async registerInferenceProviderConnection(
+    config: VertexAiConnectionConfig,
+    validatedModels?: InferenceModel[],
+  ): Promise<void> {
+    if (!this.provider) throw new Error('Vertex AI provider is not initialized');
+
+    const configHash = this.getConfigHash(config);
+
+    if (this.connections.has(configHash)) {
+      throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
+    }
+
+    const resolvedDir = this.resolveCredentialsDir(config.credentialsDir);
+    const credFile = join(resolvedDir, ADC_FILENAME);
+
+    const vertexAnthropic = createVertexAnthropic({
+      project: config.projectId,
+      location: config.region,
+      googleAuthOptions: {
+        keyFilename: credFile,
+      },
+    });
+
+    const clean = async (): Promise<void> => {
+      this.connections.get(configHash)?.dispose();
+      this.connections.delete(configHash);
+      await this.removeConnectionConfig(config);
+    };
+
+    let status: ProviderConnectionStatus = 'unknown';
+    let models: InferenceModel[];
+
+    if (validatedModels) {
+      models = validatedModels;
+    } else {
+      models = [];
+      try {
+        const creds = await this.readCredentials(config.credentialsDir);
+        const accessToken = await this.exchangeToken(creds);
+        models = await this.fetchModels(config.projectId, config.region, accessToken);
+        console.log(
+          `Vertex AI: fetched ${models.length} model(s) for ${config.projectId}/${config.region}:`,
+          models.map(m => m.label),
+        );
+      } catch (err: unknown) {
+        console.error(`Vertex AI: connection to ${config.projectId}/${config.region} is degraded`, err);
+        status = 'stopped';
+      }
+    }
+
+    const connectionDisposable = this.provider.registerInferenceProviderConnection({
+      name: `${config.projectId} (${config.region})`,
+      type: 'cloud',
+      llmMetadata: {
+        name: 'anthropic',
+      },
+      sdk: vertexAnthropic,
+      status(): ProviderConnectionStatus {
+        return status;
+      },
+      lifecycle: {
+        delete: clean.bind(this),
+      },
+      models,
+      credentials(): Record<string, string> {
+        return {
+          projectId: config.projectId,
+          region: config.region,
+          credentialsDir: config.credentialsDir,
+        };
+      },
+    });
+    this.connections.set(configHash, connectionDisposable);
+  }
+
+  /**
+   * End-to-end validation: credentials, token exchange, and project/region reachability.
+   * Returns the fetched models so the factory can pass them directly to registration.
+   */
+  private async validateConnection(config: VertexAiConnectionConfig): Promise<InferenceModel[]> {
+    const resolvedDir = this.resolveCredentialsDir(config.credentialsDir);
+    const credFile = join(resolvedDir, ADC_FILENAME);
+
+    try {
+      await access(credFile);
+    } catch {
+      throw new Error(`Credentials file not found: ${credFile}. Run "gcloud auth application-default login" first.`);
+    }
+
+    let creds: AdcCredentials;
+    try {
+      creds = await this.readCredentials(config.credentialsDir);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Invalid credentials file: ${msg}`);
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await this.exchangeToken(creds);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Authentication failed — verify your ADC credentials are current: ${msg}`);
+    }
+
+    const models = await this.fetchModels(config.projectId, config.region, accessToken);
+    console.log(
+      `Vertex AI: validated connection — ${models.length} model(s) for ${config.projectId}/${config.region}:`,
+      models.map(m => m.label),
+    );
+    return models;
+  }
+
+  private async factory(params: { [p: string]: unknown }): Promise<void> {
+    const projectId = params['vertex-ai.factory.projectId'];
+    const region = params['vertex-ai.factory.region'];
+    const credentialsDir = params['vertex-ai.factory.credentialsDir'];
+
+    if (!projectId || typeof projectId !== 'string') throw new Error('Project ID is required');
+    if (!region || typeof region !== 'string') throw new Error('Region is required');
+    if (!credentialsDir || typeof credentialsDir !== 'string') throw new Error('Credentials directory is required');
+
+    const config: VertexAiConnectionConfig = {
+      projectId: projectId.trim(),
+      region: region.trim(),
+      credentialsDir: credentialsDir.trim(),
+    };
+
+    const models = await this.validateConnection(config);
+
+    await this.saveConnectionConfig(config);
+    await this.registerInferenceProviderConnection(config, models);
+  }
+
+  dispose(): void {
+    this.provider?.dispose();
+    for (const disposable of this.connections.values()) {
+      disposable.dispose();
+    }
+    this.connections.clear();
+  }
+}
