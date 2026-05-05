@@ -47,7 +47,7 @@ vi.mock('/@/lib/guided-setup/agent-registry', () => ({
       cliName: 'claude-vertex',
       title: 'Claude on Vertex AI',
       description: 'Claude via Vertex AI.',
-      modelFilter: 'anthropic-vertex',
+      modelFilter: 'vertexai',
     },
     { cliName: 'cursor', title: 'Cursor', description: 'AI code editor.' },
     { cliName: 'goose', title: 'Goose', description: 'Autonomous coding agent.', runtimes: ['podman'] },

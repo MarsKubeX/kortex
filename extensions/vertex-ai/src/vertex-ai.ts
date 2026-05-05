@@ -34,12 +34,10 @@ import type {
 export const CONNECTIONS_KEY = 'vertex-ai:connections';
 const FETCH_TIMEOUT_MS = 30_000;
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
-const ADC_FILENAME = 'application_default_credentials.json';
-
 export interface VertexAiConnectionConfig {
   projectId: string;
   region: string;
-  credentialsDir: string;
+  credentialsFile: string;
 }
 
 interface AdcCredentials {
@@ -141,31 +139,30 @@ export class VertexAi implements Disposable {
 
   private getConfigHash(config: VertexAiConnectionConfig): string {
     const sha256 = createHash('sha256');
-    return sha256.update(`${config.projectId}:${config.region}:${config.credentialsDir}`).digest('hex');
+    return sha256.update(`${config.projectId}:${config.region}:${config.credentialsFile}`).digest('hex');
   }
 
-  private resolveCredentialsDir(credentialsDir: string): string {
-    if (credentialsDir.startsWith('~')) {
-      return join(homedir(), credentialsDir.slice(1));
+  private resolveCredentialsPath(credentialsFile: string): string {
+    if (credentialsFile.startsWith('~')) {
+      return join(homedir(), credentialsFile.slice(1));
     }
-    return credentialsDir;
+    return credentialsFile;
   }
 
-  async readCredentials(credentialsDir: string): Promise<AdcCredentials> {
-    const resolvedDir = this.resolveCredentialsDir(credentialsDir);
-    const credFile = join(resolvedDir, ADC_FILENAME);
-    const content = await readFile(credFile, 'utf-8');
+  async readCredentials(credentialsFile: string): Promise<AdcCredentials> {
+    const resolvedPath = this.resolveCredentialsPath(credentialsFile);
+    const content = await readFile(resolvedPath, 'utf-8');
     const creds = JSON.parse(content) as AdcCredentials;
 
     if (creds.type !== 'authorized_user') {
       throw new Error(
-        `Unsupported ADC type "${creds.type}" in ${credFile}: expected "authorized_user". ` +
+        `Unsupported ADC type "${creds.type}" in ${resolvedPath}: expected "authorized_user". ` +
           'Run "gcloud auth application-default login" to generate user credentials.',
       );
     }
 
     if (!creds.client_id || !creds.client_secret || !creds.refresh_token) {
-      throw new Error(`Invalid ADC credentials in ${credFile}: missing required fields`);
+      throw new Error(`Invalid ADC credentials in ${resolvedPath}: missing required fields`);
     }
 
     return creds;
@@ -195,7 +192,8 @@ export class VertexAi implements Disposable {
   }
 
   async fetchModels(projectId: string, region: string, accessToken: string): Promise<InferenceModel[]> {
-    const url = `https://${region}-aiplatform.googleapis.com/v1beta1/publishers/anthropic/models`;
+    const host = region === 'global' ? 'aiplatform.googleapis.com' : `${region}-aiplatform.googleapis.com`;
+    const url = `https://${host}/v1beta1/publishers/anthropic/models`;
 
     const response = await fetch(url, {
       headers: {
@@ -259,8 +257,7 @@ export class VertexAi implements Disposable {
       throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
     }
 
-    const resolvedDir = this.resolveCredentialsDir(config.credentialsDir);
-    const credFile = join(resolvedDir, ADC_FILENAME);
+    const credFile = this.resolveCredentialsPath(config.credentialsFile);
 
     const vertexAnthropic = createVertexAnthropic({
       project: config.projectId,
@@ -284,7 +281,7 @@ export class VertexAi implements Disposable {
     } else {
       models = [];
       try {
-        const creds = await this.readCredentials(config.credentialsDir);
+        const creds = await this.readCredentials(config.credentialsFile);
         const accessToken = await this.exchangeToken(creds);
         models = await this.fetchModels(config.projectId, config.region, accessToken);
         console.log(
@@ -301,7 +298,7 @@ export class VertexAi implements Disposable {
       name: `${config.projectId} (${config.region})`,
       type: 'cloud',
       llmMetadata: {
-        name: 'anthropic-vertex',
+        name: 'vertexai',
       },
       sdk: vertexAnthropic,
       status(): ProviderConnectionStatus {
@@ -315,7 +312,7 @@ export class VertexAi implements Disposable {
         return {
           projectId: config.projectId,
           region: config.region,
-          credentialsDir: config.credentialsDir,
+          credentialsFile: config.credentialsFile,
         };
       },
     });
@@ -327,8 +324,7 @@ export class VertexAi implements Disposable {
    * Returns the fetched models so the factory can pass them directly to registration.
    */
   private async validateConnection(config: VertexAiConnectionConfig): Promise<InferenceModel[]> {
-    const resolvedDir = this.resolveCredentialsDir(config.credentialsDir);
-    const credFile = join(resolvedDir, ADC_FILENAME);
+    const credFile = this.resolveCredentialsPath(config.credentialsFile);
 
     try {
       await access(credFile);
@@ -338,7 +334,7 @@ export class VertexAi implements Disposable {
 
     let creds: AdcCredentials;
     try {
-      creds = await this.readCredentials(config.credentialsDir);
+      creds = await this.readCredentials(config.credentialsFile);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`Invalid credentials file: ${msg}`);
@@ -363,16 +359,16 @@ export class VertexAi implements Disposable {
   private async factory(params: { [p: string]: unknown }): Promise<void> {
     const projectId = params['vertex-ai.factory.projectId'];
     const region = params['vertex-ai.factory.region'];
-    const credentialsDir = params['vertex-ai.factory.credentialsDir'];
+    const credentialsFile = params['vertex-ai.factory.credentialsFile'];
 
     if (!projectId || typeof projectId !== 'string') throw new Error('Project ID is required');
     if (!region || typeof region !== 'string') throw new Error('Region is required');
-    if (!credentialsDir || typeof credentialsDir !== 'string') throw new Error('Credentials directory is required');
+    if (!credentialsFile || typeof credentialsFile !== 'string') throw new Error('Credentials file is required');
 
     const config: VertexAiConnectionConfig = {
       projectId: projectId.trim(),
       region: region.trim(),
-      credentialsDir: credentialsDir.trim(),
+      credentialsFile: credentialsFile.trim(),
     };
 
     const models = await this.validateConnection(config);
