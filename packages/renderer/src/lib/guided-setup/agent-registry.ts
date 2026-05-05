@@ -96,7 +96,7 @@ export const agentDefinitions: AgentDefinition[] = [
     icon: faGoogle,
     iconComponent: VertexAIIcon,
     colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600',
-    modelFilter: 'anthropic-vertex',
+    modelFilter: 'vertexai',
     panel: ClaudeVertexPanel,
     runtimes: ['podman'],
   },

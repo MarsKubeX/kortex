@@ -59,7 +59,7 @@ const VALID_CREDENTIALS = JSON.stringify({
 const VALID_CONFIG: VertexAiConnectionConfig = {
   projectId: 'my-gcp-project',
   region: 'us-east5',
-  credentialsDir: '/home/user/.config/gcloud',
+  credentialsFile: '/home/user/.config/gcloud/application_default_credentials.json',
 };
 
 function mockFetchResponses(): void {
@@ -151,23 +151,20 @@ describe('init', () => {
 });
 
 describe('readCredentials', () => {
-  test('should read ADC from specified directory', async () => {
+  test('should read ADC from specified file', async () => {
     const vertexAi = createVertexAi();
-    const creds = await vertexAi.readCredentials('/home/user/.config/gcloud');
+    const creds = await vertexAi.readCredentials('/home/user/.config/gcloud/application_default_credentials.json');
 
-    expect(readFile).toHaveBeenCalledWith(
-      join('/home/user/.config/gcloud', 'application_default_credentials.json'),
-      'utf-8',
-    );
+    expect(readFile).toHaveBeenCalledWith('/home/user/.config/gcloud/application_default_credentials.json', 'utf-8');
     expect(creds.client_id).toBe('test-client-id.apps.googleusercontent.com');
   });
 
   test('should expand tilde in credentials path', async () => {
     const vertexAi = createVertexAi();
-    await vertexAi.readCredentials('~/.config/gcloud');
+    await vertexAi.readCredentials('~/.config/gcloud/application_default_credentials.json');
 
     expect(readFile).toHaveBeenCalledWith(
-      join('/home/testuser', '.config/gcloud', 'application_default_credentials.json'),
+      join('/home/testuser', '.config/gcloud/application_default_credentials.json'),
       'utf-8',
     );
   });
@@ -263,6 +260,21 @@ describe('fetchModels', () => {
     );
   });
 
+  test('should use non-prefixed host for global region', async () => {
+    const vertexAi = createVertexAi();
+    await vertexAi.fetchModels('my-project', 'global', 'test-token');
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://aiplatform.googleapis.com/v1beta1/publishers/anthropic/models',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer test-token',
+          'x-goog-user-project': 'my-project',
+        },
+      }),
+    );
+  });
+
   test('should handle empty model list', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ publisherModels: [] }), { status: 200 }),
@@ -294,10 +306,10 @@ describe('factory', () => {
     await expect(create({ 'vertex-ai.factory.projectId': 'proj' })).rejects.toThrow('Region is required');
   });
 
-  test('should throw when credentialsDir is missing', async () => {
+  test('should throw when credentialsFile is missing', async () => {
     await expect(
       create({ 'vertex-ai.factory.projectId': 'proj', 'vertex-ai.factory.region': 'us-east5' }),
-    ).rejects.toThrow('Credentials directory is required');
+    ).rejects.toThrow('Credentials file is required');
   });
 
   test('should throw when credentials file does not exist', async () => {
@@ -307,7 +319,7 @@ describe('factory', () => {
       create({
         'vertex-ai.factory.projectId': 'my-project',
         'vertex-ai.factory.region': 'us-east5',
-        'vertex-ai.factory.credentialsDir': '/bad/path',
+        'vertex-ai.factory.credentialsFile': '/bad/path/creds.json',
       }),
     ).rejects.toThrow('Credentials file not found');
   });
@@ -319,7 +331,7 @@ describe('factory', () => {
       create({
         'vertex-ai.factory.projectId': 'my-project',
         'vertex-ai.factory.region': 'us-east5',
-        'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
       }),
     ).rejects.toThrow('Invalid credentials file');
   });
@@ -331,7 +343,7 @@ describe('factory', () => {
       create({
         'vertex-ai.factory.projectId': 'my-project',
         'vertex-ai.factory.region': 'us-east5',
-        'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
       }),
     ).rejects.toThrow('Authentication failed');
   });
@@ -354,7 +366,7 @@ describe('factory', () => {
       create({
         'vertex-ai.factory.projectId': 'bad-project',
         'vertex-ai.factory.region': 'us-east5',
-        'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
       }),
     ).rejects.toThrow('Vertex AI API has not been enabled for project bad-project');
   });
@@ -374,7 +386,7 @@ describe('factory', () => {
       create({
         'vertex-ai.factory.projectId': 'my-project',
         'vertex-ai.factory.region': 'bad-region',
-        'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
       }),
     ).rejects.toThrow('Region "bad-region" not found');
   });
@@ -388,7 +400,7 @@ describe('factory', () => {
       create({
         'vertex-ai.factory.projectId': 'my-project',
         'vertex-ai.factory.region': 'us-east5',
-        'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
       }),
     ).rejects.toThrow('registration boom');
 
@@ -400,7 +412,7 @@ describe('factory', () => {
     await create({
       'vertex-ai.factory.projectId': 'my-project',
       'vertex-ai.factory.region': 'us-east5',
-      'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
     });
 
     expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledOnce();
@@ -409,7 +421,7 @@ describe('factory', () => {
       expect.objectContaining({
         name: 'my-project (us-east5)',
         type: 'cloud',
-        llmMetadata: { name: 'anthropic-vertex' },
+        llmMetadata: { name: 'vertexai' },
         sdk: VERTEX_ANTHROPIC_MOCK,
         models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-haiku-3.5-20241022' }],
       }),
@@ -420,14 +432,14 @@ describe('factory', () => {
     await create({
       'vertex-ai.factory.projectId': 'my-project',
       'vertex-ai.factory.region': 'us-east5',
-      'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
     });
 
     expect(createVertexAnthropic).toHaveBeenCalledWith({
       project: 'my-project',
       location: 'us-east5',
       googleAuthOptions: {
-        keyFilename: join('/home/user/.config/gcloud', 'application_default_credentials.json'),
+        keyFilename: '/home/user/.config/gcloud/application_default_credentials.json',
       },
     });
   });
@@ -451,7 +463,7 @@ describe('connection delete lifecycle', () => {
     await create({
       'vertex-ai.factory.projectId': 'my-project',
       'vertex-ai.factory.region': 'us-east5',
-      'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
     });
 
     const registerMock = vi.mocked(PROVIDER_MOCK.registerInferenceProviderConnection);
@@ -491,7 +503,7 @@ describe('dispose', () => {
     await create({
       'vertex-ai.factory.projectId': 'my-project',
       'vertex-ai.factory.region': 'us-east5',
-      'vertex-ai.factory.credentialsDir': '/home/user/.config/gcloud',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
     });
 
     vertexAi.dispose();
