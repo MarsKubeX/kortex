@@ -37,9 +37,9 @@ interface WorkspaceEnvVar {
 }
 
 function buildWorkspaceConfig(): { environment: WorkspaceEnvVar[] } {
-  const agent = onboardingState.agent;
+  const resolved = getAgentDefinition(onboardingState.agent).cliAgent ?? onboardingState.agent;
 
-  if (agent === 'claude' && onboardingState.secretName) {
+  if (resolved === 'claude' && onboardingState.secretName) {
     return {
       environment: [{ name: 'ANTHROPIC_API_KEY', secret: onboardingState.secretName }],
     };

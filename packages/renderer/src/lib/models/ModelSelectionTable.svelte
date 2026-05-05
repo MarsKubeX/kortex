@@ -73,20 +73,20 @@ function navigateToModels(): void {
 <!-- Toolbar -->
 <div class="flex items-center justify-between mb-3 gap-3">
   <div
-    class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--pd-content-card-border)] bg-[var(--pd-content-card-inset-bg)] flex-1 max-w-xs">
-    <Icon icon={faSearch} size="sm" class="text-[var(--pd-content-card-text)] opacity-50" />
+    class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-(--pd-content-card-border) bg-(--pd-content-card-inset-bg) flex-1 max-w-xs">
+    <Icon icon={faSearch} size="sm" class="text-(--pd-content-card-text) opacity-50" />
     <input
       type="search"
       bind:value={searchTerm}
       placeholder="Filter models…"
       autocomplete="off"
       aria-label="Filter catalog models"
-      class="bg-transparent border-none outline-none text-sm text-[var(--pd-content-card-text)] placeholder:opacity-50 w-full" />
+      class="bg-transparent border-none outline-none text-sm text-(--pd-content-card-text) placeholder:opacity-50 w-full" />
   </div>
   {#if showCatalogLink}
     <button
       type="button"
-      class="text-xs text-[var(--pd-link)] hover:underline whitespace-nowrap"
+      class="text-xs text-(--pd-link) hover:underline whitespace-nowrap"
       onclick={navigateToModels}>
       Open Models catalog
     </button>
@@ -94,9 +94,9 @@ function navigateToModels(): void {
 </div>
 
 {#if !hasAnyModels}
-  <div class="text-sm text-[var(--pd-content-card-text)] opacity-70 py-4 text-center" data-testid="no-models">
+  <div class="text-sm text-(--pd-content-card-text) opacity-70 py-4 text-center" data-testid="no-models">
     No model sources match your settings.
-    <button type="button" class="text-[var(--pd-link)] hover:underline" onclick={navigateToModels}>
+    <button type="button" class="text-(--pd-link) hover:underline" onclick={navigateToModels}>
       Enable a provider in Models
     </button>, then return here.
   </div>
@@ -105,10 +105,10 @@ function navigateToModels(): void {
     {#each ([['cloud', cloudModels], ['corporate', corporateModels], ['local', localModels]] as const) as [category, catModels] (category)}
       {#if catModels.length > 0}
         <div>
-          <h4 class="text-xs font-semibold text-[var(--pd-content-card-text)] opacity-60 uppercase tracking-wide mb-2">
+          <h4 class="text-xs font-semibold text-(--pd-content-card-text) opacity-60 uppercase tracking-wide mb-2">
             {categoryLabels[category]}
           </h4>
-          <div class="rounded-md border border-[var(--pd-content-card-border)] overflow-x-auto">
+          <div class="rounded-md border border-(--pd-content-card-border) overflow-x-auto">
             <table class="w-full text-sm table-fixed" aria-label="{categoryLabels[category]} models">
               <colgroup>
                 <col class="w-14" />
@@ -118,12 +118,12 @@ function navigateToModels(): void {
                 <col class="w-14" />
               </colgroup>
               <thead>
-                <tr class="border-b border-[var(--pd-content-card-border)] bg-[var(--pd-content-card-inset-bg)]">
-                  <th class="px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Status</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Name</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Size</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Runtime</th>
-                  <th class="px-3 py-2 text-center text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Use</th>
+                <tr class="border-b border-(--pd-content-card-border) bg-(--pd-content-card-inset-bg)">
+                  <th class="px-3 py-2 text-left text-xs font-medium text-(--pd-content-card-text) opacity-60">Status</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-(--pd-content-card-text) opacity-60">Name</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-(--pd-content-card-text) opacity-60">Size</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-(--pd-content-card-text) opacity-60">Runtime</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium text-(--pd-content-card-text) opacity-60">Use</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,9 +133,9 @@ function navigateToModels(): void {
                   <tr
                     role="button"
                     tabindex="0"
-                    class="border-b border-[var(--pd-content-card-border)] last:border-b-0 transition-colors
-                      cursor-pointer hover:bg-[var(--pd-content-card-hover-inset-bg)]
-                      {isSelected ? 'bg-[var(--pd-content-card-hover-inset-bg)]' : ''}"
+                    class="border-b border-(--pd-content-card-border) last:border-b-0 transition-colors
+                      cursor-pointer hover:bg-(--pd-content-card-hover-inset-bg)
+                      {isSelected ? 'bg-(--pd-content-card-hover-inset-bg)' : ''}"
                     onclick={onselect?.bind(undefined, model)}
                     onkeydown={(e: KeyboardEvent): void => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -148,11 +148,11 @@ function navigateToModels(): void {
                       <StatusIcon status={getModelStatus(model)} />
                     </td>
                     <td class="px-3 py-2">
-                      <div class="font-medium text-[var(--pd-table-body-text-highlight)]">{model.label}</div>
-                      <div class="text-[11px] text-[var(--pd-content-card-text)] opacity-60">{model.connectionName}</div>
+                      <div class="font-medium text-(--pd-table-body-text-highlight)">{model.label}</div>
+                      <div class="text-[11px] text-(--pd-content-card-text) opacity-60">{model.connectionName}</div>
                     </td>
-                    <td class="px-3 py-2 text-[var(--pd-table-body-text)]">—</td>
-                    <td class="px-3 py-2 text-[var(--pd-table-body-text)]">{model.providerName}</td>
+                    <td class="px-3 py-2 text-(--pd-table-body-text)">—</td>
+                    <td class="px-3 py-2 text-(--pd-table-body-text)">{model.providerName}</td>
                     <td class="px-3 py-2 text-center">
                       <input
                         type="radio"

@@ -212,12 +212,13 @@ describe('model selection', () => {
     expect(radio).toBeChecked();
   });
 
-  test('clears model when no compatible models exist', async () => {
+  test('preserves model when catalog is empty (loading)', async () => {
+    const seeded = { providerId: 'claude', label: 'claude-sonnet-4-20250514' };
     stubProviders([]);
-    renderStep({ agent: 'claude' });
+    renderStep({ agent: 'claude', model: seeded });
 
     await waitFor(() => {
-      expect(onboarding.model).toBeUndefined();
+      expect(onboarding.model).toEqual(seeded);
     });
   });
 });

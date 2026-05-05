@@ -28,7 +28,9 @@ let errorMessage = $state('');
 
 let claudeProvider = $derived($providerInfos.find(p => p.id === providerId));
 
-let existingConnection = $derived(claudeProvider?.inferenceConnections?.find(c => c.models.length > 0));
+let existingConnection = $derived(
+  claudeProvider?.inferenceConnections?.find(c => c.status === 'started' && c.models.length > 0),
+);
 let alreadyConnected = $derived(!!existingConnection);
 
 $effect(() => {

@@ -45,6 +45,7 @@ let effectiveModel: CatalogModelInfo | undefined = $derived.by(() => {
 });
 
 $effect(() => {
+  if (agentFilteredModels.length === 0) return;
   if (effectiveModel) {
     const sel: OnboardingModelSelection = {
       providerId: effectiveModel.providerId,

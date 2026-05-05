@@ -271,6 +271,28 @@ describe('already connected', () => {
 
     expect(onboarding.secretName).toBe('anthropic');
   });
+
+  test('does not treat a stopped connection as already connected', () => {
+    const providers = [
+      {
+        id: 'claude',
+        internalId: 'claude-internal-1',
+        inferenceConnections: [
+          {
+            type: 'cloud',
+            status: 'stopped',
+            models: [{ label: 'claude-sonnet-4-20250514' }],
+          },
+        ],
+        inferenceProviderConnectionCreation: true,
+      },
+    ];
+    (providerInfos as Writable<ProviderInfo[]>).set(providers as unknown as ProviderInfo[]);
+    renderPanel();
+
+    expect(screen.queryByTestId('claude-already-connected')).not.toBeInTheDocument();
+    expect(screen.getByTestId('claude-form')).toBeInTheDocument();
+  });
 });
 
 describe('cleanup', () => {
