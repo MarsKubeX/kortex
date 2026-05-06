@@ -85,8 +85,6 @@ export const agentDefinitions: AgentDefinition[] = [
     providerSelector: 'kaiden.claude:claude',
     secretType: 'anthropic',
   },
-  // TODO: Show this tile once the Vertex AI extension is available.
-  // Hidden for now because it has no `panel`, so CodingAgentStep filters it out.
   {
     cliName: 'claude-vertex',
     cliAgent: 'claude',

@@ -459,6 +459,22 @@ describe('factory', () => {
     expect(SECRET_STORAGE_MOCK.store).toHaveBeenNthCalledWith(2, CONNECTIONS_KEY, '[]');
   });
 
+  test('should reject duplicate connection for same project and region', async () => {
+    await create({
+      'vertex-ai.factory.projectId': 'my-project',
+      'vertex-ai.factory.region': 'us-east5',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
+    });
+
+    await expect(
+      create({
+        'vertex-ai.factory.projectId': 'my-project',
+        'vertex-ai.factory.region': 'us-east5',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
+      }),
+    ).rejects.toThrow('Connection already exists for project my-project in us-east5');
+  });
+
   test('should save config and register connection', async () => {
     await create({
       'vertex-ai.factory.projectId': 'my-project',
