@@ -24,7 +24,7 @@ import { createVertexAnthropic } from '@ai-sdk/google-vertex/anthropic';
 import type { Disposable, Logger, Provider, provider as ProviderAPI, SecretStorage } from '@openkaiden/api';
 import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { CONNECTIONS_KEY, VertexAi, type VertexAiConnectionConfig } from './vertex-ai';
+import { CONNECTIONS_KEY, FALLBACK_MODELS, VertexAi, type VertexAiConnectionConfig } from './vertex-ai';
 
 vi.mock(import('node:fs/promises'));
 vi.mock(import('node:os'));
@@ -138,6 +138,20 @@ describe('init', () => {
     await vertexAi.init();
 
     expect(PROVIDER_MOCK.registerInferenceProviderConnection).not.toHaveBeenCalled();
+  });
+
+  test('should restore connections with fallback models when fetch fails', async () => {
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(JSON.stringify([VALID_CONFIG]));
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'));
+
+    const vertexAi = createVertexAi();
+    await vertexAi.init();
+
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        models: FALLBACK_MODELS,
+      }),
+    );
   });
 
   test('should handle corrupted secret storage', async () => {
@@ -348,7 +362,7 @@ describe('factory', () => {
     ).rejects.toThrow('Authentication failed');
   });
 
-  test('should throw descriptive error when project access is denied', async () => {
+  test('should fall back to hardcoded models on 403 with API-not-enabled message', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url === 'https://oauth2.googleapis.com/token') {
@@ -362,13 +376,17 @@ describe('factory', () => {
       );
     });
 
-    await expect(
-      create({
-        'vertex-ai.factory.projectId': 'bad-project',
-        'vertex-ai.factory.region': 'us-east5',
-        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
+    await create({
+      'vertex-ai.factory.projectId': 'bad-project',
+      'vertex-ai.factory.region': 'us-east5',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
+    });
+
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        models: FALLBACK_MODELS,
       }),
-    ).rejects.toThrow('Vertex AI API has not been enabled for project bad-project');
+    );
   });
 
   test('should throw region error when region does not exist', async () => {
@@ -389,6 +407,39 @@ describe('factory', () => {
         'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
       }),
     ).rejects.toThrow('Region "bad-region" not found');
+  });
+
+  test('should fall back to hardcoded models on 403 (listing permission denied)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return new Response(JSON.stringify({ access_token: 'mock-token', token_type: 'Bearer', expires_in: 3600 }), {
+          status: 200,
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 403,
+            message:
+              'Caller does not have required permission to use project my-corp-project. Grant the caller the roles/serviceusage.serviceUsageConsumer role.',
+          },
+        }),
+        { status: 403 },
+      );
+    });
+
+    await create({
+      'vertex-ai.factory.projectId': 'my-corp-project',
+      'vertex-ai.factory.region': 'us-east5',
+      'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
+    });
+
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        models: FALLBACK_MODELS,
+      }),
+    );
   });
 
   test('should rollback saved config if registration fails', async () => {
