@@ -63,6 +63,7 @@ vi.mock(import('./guided-setup-steps'), async importOriginal => {
     ] satisfies GuidedSetupStep[],
     createDefaultOnboardingState: (): OnboardingState => ({
       agent: 'opencode',
+      workspaceSetting: {},
     }),
   };
 });
@@ -222,6 +223,26 @@ test('Skip closes without persisting any settings', async () => {
   expect(window.updateConfigurationValue).not.toHaveBeenCalled();
 });
 
+test('persists default workspace settings when wizard completes', async () => {
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+
+  await waitFor(() => {
+    expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultWorkspaceSettings', {
+      defaultAgent: 'opencode',
+      defaultAgentSettings: {
+        opencode: {
+          defaultModel: undefined,
+          workspaceConfiguration: {},
+        },
+      },
+    });
+  });
+});
+
 test('closes wizard even when persistence fails', async () => {
   const persistError = new Error('write failed');
   vi.stubGlobal('updateConfigurationValue', vi.fn().mockRejectedValue(persistError));
@@ -294,7 +315,13 @@ test('persists defaultWorkspaceSettings with workspaceConfig when wizard complet
 
   await waitFor(() => {
     expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultWorkspaceSettings', {
-      workspaceConfig: { environment: [] },
+      defaultAgent: 'opencode',
+      defaultAgentSettings: {
+        opencode: {
+          defaultModel: undefined,
+          workspaceConfiguration: {},
+        },
+      },
     });
   });
 });

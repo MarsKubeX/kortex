@@ -144,6 +144,7 @@ describe('opencode agent models', () => {
     await waitFor(() => {
       expect(onboarding.model).toEqual({
         providerId: 'ollama',
+        connectionName: 'default',
         label: 'llama3.2:3b',
       });
     });
@@ -175,6 +176,7 @@ describe('claude agent models', () => {
     await waitFor(() => {
       expect(onboarding.model).toEqual({
         providerId: 'claude',
+        connectionName: 'api-key',
         label: 'claude-sonnet-4-20250514',
       });
     });
@@ -192,6 +194,7 @@ describe('model selection', () => {
     await waitFor(() => {
       expect(onboarding.model).toEqual({
         providerId: 'ollama',
+        connectionName: 'default',
         label: 'codellama:7b',
       });
     });
@@ -201,7 +204,7 @@ describe('model selection', () => {
     stubProviders(OPENCODE_PROVIDERS);
     renderStep({
       agent: 'opencode',
-      model: { providerId: 'ollama', label: 'codellama:7b' },
+      model: { providerId: 'ollama', connectionName: 'ollama', label: 'codellama:7b' },
     });
 
     await waitFor(() => {
@@ -213,7 +216,7 @@ describe('model selection', () => {
   });
 
   test('preserves model when catalog is empty (loading)', async () => {
-    const seeded = { providerId: 'claude', label: 'claude-sonnet-4-20250514' };
+    const seeded = { providerId: 'claude', connectionName: 'claude', label: 'claude-sonnet-4-20250514' };
     stubProviders([]);
     renderStep({ agent: 'claude', model: seeded });
 
