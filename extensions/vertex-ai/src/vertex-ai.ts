@@ -405,6 +405,10 @@ export class VertexAi implements Disposable {
       credentialsFile: credentialsFile.trim(),
     };
 
+    if (this.connections.has(this.getConfigHash(config))) {
+      throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
+    }
+
     const models = await this.validateConnection(config);
 
     await this.saveConnectionConfig(config);
