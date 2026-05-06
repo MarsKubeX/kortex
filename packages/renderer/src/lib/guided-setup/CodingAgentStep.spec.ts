@@ -64,7 +64,7 @@ function renderStep(overrides: Partial<OnboardingState> = {}): void {
   Object.assign(onboarding, overrides);
   render(CodingAgentStep, {
     stepId: 'coding-agent',
-    title: 'Choose your coding agent',
+    title: 'Coding agent',
     description: 'Pick one runtime for kdn.',
     onboarding,
   });
@@ -100,7 +100,7 @@ describe('rendering', () => {
   test('step title and description are rendered', () => {
     renderStep();
 
-    expect(screen.getByText('Choose your coding agent')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Coding agent' })).toBeInTheDocument();
     expect(screen.getByText('Pick one runtime for kdn.')).toBeInTheDocument();
   });
 
@@ -228,54 +228,13 @@ describe('Claude agent tile', () => {
   });
 });
 
-describe('Claude on Vertex AI tile', () => {
-  test('renders the Vertex AI tile when CLI includes claude', async () => {
-    renderStep();
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Claude on Vertex AI' })).toBeInTheDocument();
+describe('agents without panels', () => {
+  test('does not show Cursor tile (no panel configured)', async () => {
+    vi.mocked(window.getCliInfo).mockResolvedValue({
+      version: '0.1.0',
+      agents: ['opencode', 'claude', 'cursor'],
+      runtimes: ['podman'],
     });
-  });
-
-  test('shows Vertex AI badge on the tile', async () => {
-    renderStep();
-
-    await waitFor(() => {
-      expect(screen.getByText('Vertex AI')).toBeInTheDocument();
-    });
-  });
-
-  test('shows Vertex panel when Claude on Vertex AI is selected', async () => {
-    renderStep();
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Claude on Vertex AI' })).toBeInTheDocument();
-    });
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Claude on Vertex AI' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('claude-vertex-panel')).toBeInTheDocument();
-      expect(screen.getByText('Google Cloud Vertex AI')).toBeInTheDocument();
-    });
-  });
-
-  test('updates onboarding.agent when Claude on Vertex AI is selected', async () => {
-    renderStep();
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Claude on Vertex AI' })).toBeInTheDocument();
-    });
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Claude on Vertex AI' }));
-
-    await waitFor(() => {
-      expect(onboarding.agent).toBe('claude-vertex');
-    });
-  });
-
-  test('does not show Vertex tile when CLI does not include claude', async () => {
-    vi.mocked(window.getCliInfo).mockResolvedValue({ version: '0.1.0', agents: ['opencode'], runtimes: ['podman'] });
 
     renderStep();
 
@@ -283,7 +242,23 @@ describe('Claude on Vertex AI tile', () => {
       expect(screen.getByRole('button', { name: 'OpenCode' })).toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: 'Claude on Vertex AI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cursor' })).not.toBeInTheDocument();
+  });
+
+  test('does not show Goose tile (no panel configured)', async () => {
+    vi.mocked(window.getCliInfo).mockResolvedValue({
+      version: '0.1.0',
+      agents: ['opencode', 'claude', 'goose'],
+      runtimes: ['podman'],
+    });
+
+    renderStep();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'OpenCode' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Goose' })).not.toBeInTheDocument();
   });
 });
 

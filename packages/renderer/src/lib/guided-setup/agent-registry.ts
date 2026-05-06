@@ -17,7 +17,7 @@
  ***********************************************************************/
 
 import type { IconDefinition } from '@fortawesome/fontawesome-common-types';
-import { faClaude, faGoogle } from '@fortawesome/free-brands-svg-icons';
+import { faClaude } from '@fortawesome/free-brands-svg-icons';
 import { faCode, faDesktop, faRobot, faWrench } from '@fortawesome/free-solid-svg-icons';
 import type { Component } from 'svelte';
 
@@ -25,11 +25,9 @@ import ClaudeCodeIcon from '/@/lib/images/agents/ClaudeCodeIcon.svelte';
 import CursorIcon from '/@/lib/images/agents/CursorIcon.svelte';
 import GooseIcon from '/@/lib/images/agents/GooseIcon.svelte';
 import OpenCodeIcon from '/@/lib/images/agents/OpenCodeIcon.svelte';
-import VertexAIIcon from '/@/lib/images/agents/VertexAIIcon.svelte';
 
 import type { CliAgent } from './guided-setup-steps';
 import ClaudePanel from './panels/ClaudePanel.svelte';
-import ClaudeVertexPanel from './panels/ClaudeVertexPanel.svelte';
 import OpenCodePanel from './panels/OpenCodePanel.svelte';
 
 export interface AgentDefinition {
@@ -84,17 +82,17 @@ export const agentDefinitions: AgentDefinition[] = [
     providerSelector: 'kaiden.claude:claude',
     secretType: 'anthropic',
   },
+  // TODO: Show this tile once the Vertex AI extension is available.
+  // Hidden for now because it has no `panel`, so CodingAgentStep filters it out.
   {
     cliName: 'claude-vertex',
     cliAgent: 'claude',
     title: 'Claude on Vertex AI',
-    description: 'Run Claude Code through Google Cloud Vertex AI using your GCP project credentials.',
-    badge: 'Vertex AI',
-    icon: faGoogle,
-    iconComponent: VertexAIIcon,
-    colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600',
+    description: 'Use Claude models through Google Cloud Vertex AI with application default credentials.',
+    icon: faClaude,
+    iconComponent: ClaudeCodeIcon,
+    colorClass: 'bg-gradient-to-br from-amber-600 to-amber-500',
     modelFilter: 'anthropic',
-    panel: ClaudeVertexPanel,
   },
   {
     cliName: 'cursor',

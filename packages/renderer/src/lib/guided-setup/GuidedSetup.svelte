@@ -4,6 +4,7 @@ import { Button } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 import { SvelteSet } from 'svelte/reactivity';
 
+import { getAgentDefinition } from './agent-registry';
 import { createDefaultOnboardingState, guidedSetupSteps } from './guided-setup-steps';
 
 interface Props {
@@ -18,6 +19,7 @@ let onboardingState = $state(createDefaultOnboardingState());
 
 let hasSteps = $derived(guidedSetupSteps.length > 0);
 let currentStep = $derived(guidedSetupSteps[currentStepIndex]);
+let isFirstStep = $derived(currentStepIndex === 0);
 let isLastStep = $derived(currentStepIndex === guidedSetupSteps.length - 1);
 let continueLabel = $derived(isLastStep ? 'Go to Dashboard' : 'Continue');
 
@@ -28,17 +30,35 @@ function getStepState(index: number): 'completed' | 'active' | 'upcoming' {
   return 'upcoming';
 }
 
-async function persistOnboardingDefaults(): Promise<void> {
-  await window.updateConfigurationValue('onboarding.defaultAgent', onboardingState.agent);
+interface WorkspaceEnvVar {
+  name: string;
+  value?: string;
+  secret?: string;
+}
 
-  if (onboardingState.agent === 'claude-vertex' && onboardingState.vertexConfig) {
-    await window.updateConfigurationValue('onboarding.vertexProjectId', onboardingState.vertexConfig.projectId);
-    await window.updateConfigurationValue('onboarding.vertexRegion', onboardingState.vertexConfig.region);
-    await window.updateConfigurationValue(
-      'onboarding.vertexCredentialsPath',
-      onboardingState.vertexConfig.credentialsPath,
-    );
+function buildWorkspaceConfig(): { environment: WorkspaceEnvVar[] } {
+  const resolved = getAgentDefinition(onboardingState.agent).cliAgent ?? onboardingState.agent;
+
+  if (resolved === 'claude' && onboardingState.secretName) {
+    return {
+      environment: [{ name: 'ANTHROPIC_API_KEY', secret: onboardingState.secretName }],
+    };
   }
+
+  return { environment: [] };
+}
+
+async function persistOnboardingDefaults(): Promise<void> {
+  const resolvedAgent = getAgentDefinition(onboardingState.agent).cliAgent ?? onboardingState.agent;
+  await window.updateConfigurationValue('onboarding.defaultAgent', resolvedAgent);
+
+  const settings = {
+    model: onboardingState.model ?? undefined,
+    workspaceConfig: buildWorkspaceConfig(),
+  };
+
+  const plain = JSON.parse(JSON.stringify(settings));
+  await window.updateConfigurationValue('onboarding.defaultWorkspaceSettings', plain);
 }
 
 async function advance(): Promise<void> {
@@ -73,16 +93,13 @@ async function handleContinue(): Promise<void> {
   }
 }
 
-async function handleSkip(): Promise<void> {
-  if (advancing) return;
-  advancing = true;
-  try {
-    await advance();
-  } catch (err: unknown) {
-    console.error('advance failed', err);
-  } finally {
-    advancing = false;
-  }
+function handleSkip(): void {
+  onclose();
+}
+
+function goBack(): void {
+  if (advancing || isFirstStep) return;
+  currentStepIndex--;
 }
 
 function handleStepClick(index: number): void {
@@ -147,10 +164,17 @@ function handleStepClick(index: number): void {
   </div>
 
   <!-- Footer -->
-  <footer class="flex justify-end gap-3 px-8 py-6 bg-(--pd-content-bg)">
-    {#if currentStep?.isSkippable}
-      <Button type="secondary" aria-label="Skip" onclick={handleSkip} disabled={advancing}>Skip</Button>
-    {/if}
-    <Button type="primary" aria-label={continueLabel} onclick={handleContinue} disabled={advancing}>{continueLabel} &rsaquo;</Button>
+  <footer class="flex justify-between px-8 py-6 bg-(--pd-content-bg)">
+    <div>
+      {#if !isFirstStep}
+        <Button type="secondary" aria-label="Back" onclick={goBack} disabled={advancing}>&lsaquo; Back</Button>
+      {/if}
+    </div>
+    <div class="flex gap-3">
+      {#if currentStep?.isSkippable}
+        <Button type="secondary" aria-label="Skip" onclick={handleSkip} disabled={advancing}>Skip</Button>
+      {/if}
+      <Button type="primary" aria-label={continueLabel} onclick={handleContinue} disabled={advancing}>{continueLabel} &rsaquo;</Button>
+    </div>
   </footer>
 </div>

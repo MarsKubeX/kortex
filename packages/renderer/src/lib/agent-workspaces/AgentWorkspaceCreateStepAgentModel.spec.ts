@@ -122,7 +122,7 @@ test('OpenCode tile has Recommended badge', () => {
 test('model catalog hidden when no agent selected', () => {
   render(AgentWorkspaceCreateStepAgentModel);
 
-  expect(screen.queryByText('Model for this workspace')).not.toBeInTheDocument();
+  expect(screen.queryByText('Model for workspace')).not.toBeInTheDocument();
 });
 
 test('model catalog shown after agent selection', async () => {
@@ -130,7 +130,7 @@ test('model catalog shown after agent selection', async () => {
 
   await fireEvent.click(screen.getByText('OpenCode'));
 
-  expect(screen.getByText('Model for this workspace')).toBeInTheDocument();
+  expect(screen.getByText('Model for workspace')).toBeInTheDocument();
 });
 
 test('shows empty state when no providers configured', async () => {

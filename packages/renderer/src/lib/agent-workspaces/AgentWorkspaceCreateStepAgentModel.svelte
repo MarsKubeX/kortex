@@ -1,16 +1,13 @@
 <script lang="ts">
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
-import { StatusIcon } from '@podman-desktop/ui-svelte';
-import { Icon } from '@podman-desktop/ui-svelte/icons';
 import { untrack } from 'svelte';
 
 import type { ModelInfo } from '/@/lib/chat/components/model-info';
 import { agentDefinitions } from '/@/lib/guided-setup/agent-registry';
-import { type CatalogModelInfo, getCatalogModels } from '/@/lib/models/models-utils';
-import { handleNavigation } from '/@/navigation';
+import type { CatalogModelInfo } from '/@/lib/models/models-utils';
+import { getCatalogModels } from '/@/lib/models/models-utils';
+import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
 import { disabledModels, isModelEnabled, modelKey } from '/@/stores/model-catalog';
 import { providerInfos } from '/@/stores/providers';
-import { NavigationPage } from '/@api/navigation-page';
 
 interface Props {
   selectedAgent?: string;
@@ -18,25 +15,6 @@ interface Props {
 }
 
 let { selectedAgent = $bindable(''), selectedModel = $bindable() }: Props = $props();
-
-type ModelCategory = 'cloud' | 'corporate' | 'local';
-
-const categoryLabels: Record<ModelCategory, string> = {
-  cloud: 'Cloud · LLM providers',
-  corporate: 'In-house · OpenShift AI',
-  local: 'Local · Ollama & Ramalama',
-};
-
-const statusMap: Record<string, string> = {
-  started: 'RUNNING',
-  starting: 'STARTING',
-  stopped: 'CREATED',
-  stopping: 'DELETING',
-  failed: 'DEGRADED',
-  unknown: 'RUNNING',
-};
-
-let searchTerm = $state('');
 
 let allModels: CatalogModelInfo[] = $derived.by(() => {
   const enabled = getCatalogModels($providerInfos).filter(m => isModelEnabled($disabledModels, m.providerId, m.label));
@@ -51,17 +29,11 @@ let allModels: CatalogModelInfo[] = $derived.by(() => {
 
 let agentFilteredModels: CatalogModelInfo[] = $derived(filterByAgent(allModels, selectedAgent));
 
-let displayedModels: CatalogModelInfo[] = $derived(filterBySearch(agentFilteredModels, searchTerm));
-
 let selectedAgentLabel: string = $derived(
   agentDefinitions.find(a => a.cliName === selectedAgent)?.title ?? 'the selected agent',
 );
 
-let cloudModels: CatalogModelInfo[] = $derived(displayedModels.filter(m => m.type === 'cloud'));
-let corporateModels: CatalogModelInfo[] = $derived(displayedModels.filter(m => m.type === 'self-hosted'));
-let localModels: CatalogModelInfo[] = $derived(displayedModels.filter(m => m.type === 'local'));
-
-let hasAnyModels: boolean = $derived(cloudModels.length > 0 || corporateModels.length > 0 || localModels.length > 0);
+let selectedKey: string = $derived(selectedModel ? modelKey(selectedModel.providerId, selectedModel.label) : '');
 
 function filterByAgent(models: CatalogModelInfo[], agent: string): CatalogModelInfo[] {
   if (!agent) return models;
@@ -70,22 +42,7 @@ function filterByAgent(models: CatalogModelInfo[], agent: string): CatalogModelI
   return models.filter(m => m.llmMetadata?.name === def.modelFilter);
 }
 
-function filterBySearch(models: CatalogModelInfo[], term: string): CatalogModelInfo[] {
-  if (!term.trim()) return models;
-  const q = term.trim().toLowerCase();
-  return models.filter(
-    m =>
-      m.label.toLowerCase().includes(q) ||
-      m.providerName.toLowerCase().includes(q) ||
-      m.connectionName.toLowerCase().includes(q),
-  );
-}
-
-function getModelStatus(model: CatalogModelInfo): string {
-  return statusMap[model.connectionStatus] ?? 'RUNNING';
-}
-
-function selectModel(model: CatalogModelInfo): void {
+function handleModelSelect(model: CatalogModelInfo): void {
   selectedModel = model;
 }
 
@@ -109,10 +66,6 @@ $effect(() => {
     selectedModel = undefined;
   }
 });
-
-function navigateToModels(): void {
-  handleNavigation({ page: NavigationPage.MODELS });
-}
 </script>
 
 <div class="flex flex-col gap-6">
@@ -157,105 +110,16 @@ function navigateToModels(): void {
   <!-- Model catalog -->
   {#if selectedAgent}
     <div>
-      <h3 class="text-base font-semibold text-[var(--pd-modal-text)] mb-1">Model for this workspace</h3>
+      <h3 class="text-base font-semibold text-[var(--pd-modal-text)] mb-1">Model for workspace</h3>
       <p class="text-xs text-[var(--pd-content-card-text)] opacity-70 mb-3">
         Choose the default model <strong class="text-[var(--pd-modal-text)]">{selectedAgentLabel}</strong> will use
         here. Disabled rows cannot be selected; the table is filtered to models that fit the agent you picked above.
       </p>
 
-      <!-- Toolbar -->
-      <div class="flex items-center justify-between mb-3 gap-3">
-        <div
-          class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--pd-content-card-border)] bg-[var(--pd-content-card-inset-bg)] flex-1 max-w-xs">
-          <Icon icon={faSearch} size="sm" class="text-[var(--pd-content-card-text)] opacity-50" />
-          <input
-            type="search"
-            bind:value={searchTerm}
-            placeholder="Filter models…"
-            autocomplete="off"
-            aria-label="Filter catalog models"
-            class="bg-transparent border-none outline-none text-sm text-[var(--pd-content-card-text)] placeholder:opacity-50 w-full" />
-        </div>
-        <button
-          type="button"
-          class="text-xs text-[var(--pd-link)] hover:underline whitespace-nowrap"
-          onclick={navigateToModels}>
-          Open Models catalog
-        </button>
-      </div>
-
-      {#if !hasAnyModels}
-        <div class="text-sm text-[var(--pd-content-card-text)] opacity-70 py-4 text-center">
-          No model sources match your settings.
-          <button type="button" class="text-[var(--pd-link)] hover:underline" onclick={navigateToModels}>
-            Enable a provider in Models
-          </button>, then return here.
-        </div>
-      {:else}
-        <div class="flex flex-col gap-4">
-          {#each ([['cloud', cloudModels], ['corporate', corporateModels], ['local', localModels]] as const) as [category, models] (category)}
-            {#if models.length > 0}
-              <div>
-                <h4 class="text-xs font-semibold text-[var(--pd-content-card-text)] opacity-60 uppercase tracking-wide mb-2">
-                  {categoryLabels[category]}
-                </h4>
-                <div class="rounded-md border border-[var(--pd-content-card-border)] overflow-hidden">
-                  <table class="w-full text-sm" aria-label="{categoryLabels[category]} models">
-                    <thead>
-                      <tr class="border-b border-[var(--pd-content-card-border)] bg-[var(--pd-content-card-inset-bg)]">
-                        <th class="w-10 px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Status</th>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Name</th>
-                        <th class="w-20 px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Size</th>
-                        <th class="w-28 px-3 py-2 text-left text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Runtime</th>
-                        <th class="w-12 px-3 py-2 text-center text-xs font-medium text-[var(--pd-content-card-text)] opacity-60">Use</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each models as model (modelKey(model.providerId, model.label))}
-                        {@const key = modelKey(model.providerId, model.label)}
-                        {@const isSelected = selectedModel ? modelKey(selectedModel.providerId, selectedModel.label) === key : false}
-                        <tr
-                          role="button"
-                          tabindex="0"
-                          class="border-b border-[var(--pd-content-card-border)] last:border-b-0 transition-colors
-                            cursor-pointer hover:bg-[var(--pd-content-card-hover-inset-bg)]
-                            {isSelected ? 'bg-[var(--pd-content-card-hover-inset-bg)]' : ''}"
-                          onclick={(): void => selectModel(model)}
-                          onkeydown={(e: KeyboardEvent): void => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              selectModel(model);
-                            }
-                          }}>
-                          <td class="px-3 py-2">
-                            <StatusIcon status={getModelStatus(model)} />
-                          </td>
-                          <td class="px-3 py-2">
-                            <div class="font-medium text-[var(--pd-table-body-text-highlight)]">{model.label}</div>
-                            <div class="text-[11px] text-[var(--pd-content-card-text)] opacity-60">{model.connectionName}</div>
-                          </td>
-                          <td class="px-3 py-2 text-[var(--pd-table-body-text)]">—</td>
-                          <td class="px-3 py-2 text-[var(--pd-table-body-text)]">{model.providerName}</td>
-                          <td class="px-3 py-2 text-center">
-                            <input
-                              type="radio"
-                              name="workspaceModel"
-                              value={key}
-                              checked={isSelected}
-                              aria-label="Use {model.label}"
-                              onclick={(e: MouseEvent): void => e.stopPropagation()}
-                              onchange={(): void => selectModel(model)} />
-                          </td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            {/if}
-          {/each}
-        </div>
-      {/if}
+      <ModelSelectionTable
+        models={agentFilteredModels}
+        selectedKey={selectedKey}
+        onselect={handleModelSelect} />
     </div>
   {/if}
 </div>

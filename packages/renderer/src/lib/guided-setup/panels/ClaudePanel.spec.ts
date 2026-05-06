@@ -218,6 +218,83 @@ describe('beforeAdvance callback', () => {
   });
 });
 
+describe('already connected', () => {
+  function stubConnectedProvider(): void {
+    const providers = [
+      {
+        id: 'claude',
+        internalId: 'claude-internal-1',
+        inferenceConnections: [
+          {
+            type: 'cloud',
+            status: 'started',
+            models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-3-5-haiku-20241022' }],
+          },
+        ],
+        inferenceProviderConnectionCreation: true,
+      },
+    ];
+    (providerInfos as Writable<ProviderInfo[]>).set(providers as unknown as ProviderInfo[]);
+  }
+
+  test('shows already-connected message when inference connection with models exists', () => {
+    stubConnectedProvider();
+    renderPanel();
+
+    expect(screen.getByTestId('claude-already-connected')).toBeInTheDocument();
+    expect(screen.getByText('Connection configured')).toBeInTheDocument();
+    expect(screen.getByText(/2 models/)).toBeInTheDocument();
+  });
+
+  test('hides API key form when already connected', () => {
+    stubConnectedProvider();
+    renderPanel();
+
+    expect(screen.queryByTestId('claude-form')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Anthropic API key')).not.toBeInTheDocument();
+  });
+
+  test('beforeAdvance returns true immediately when already connected', async () => {
+    stubConnectedProvider();
+    renderPanel();
+
+    const result = await onboarding.beforeAdvance!();
+
+    expect(result).toBe(true);
+    expect(window.createSecret).not.toHaveBeenCalled();
+    expect(window.createInferenceProviderConnection).not.toHaveBeenCalled();
+  });
+
+  test('sets onboarding.secretName when already connected', () => {
+    stubConnectedProvider();
+    renderPanel();
+
+    expect(onboarding.secretName).toBe('anthropic');
+  });
+
+  test('does not treat a stopped connection as already connected', () => {
+    const providers = [
+      {
+        id: 'claude',
+        internalId: 'claude-internal-1',
+        inferenceConnections: [
+          {
+            type: 'cloud',
+            status: 'stopped',
+            models: [{ label: 'claude-sonnet-4-20250514' }],
+          },
+        ],
+        inferenceProviderConnectionCreation: true,
+      },
+    ];
+    (providerInfos as Writable<ProviderInfo[]>).set(providers as unknown as ProviderInfo[]);
+    renderPanel();
+
+    expect(screen.queryByTestId('claude-already-connected')).not.toBeInTheDocument();
+    expect(screen.getByTestId('claude-form')).toBeInTheDocument();
+  });
+});
+
 describe('cleanup', () => {
   test('clears beforeAdvance when component is destroyed', () => {
     const { unmount } = render(ClaudePanel, { definition: claudeDefinition, onboarding });
