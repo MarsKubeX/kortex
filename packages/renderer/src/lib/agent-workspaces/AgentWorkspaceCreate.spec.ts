@@ -993,4 +993,107 @@ test('Expect Deny All resets to empty host list when switching from Developer Pr
   expect((screen.getByLabelText('Custom host 1') as HTMLInputElement).value).toBe('');
 });
 
+const mockVertexProvider: ProviderInfo = {
+  id: 'vertex-ai',
+  name: 'Vertex AI',
+  internalId: 'vertex-ai-internal',
+  status: 'started',
+  inferenceConnections: [
+    {
+      name: 'my-project (us-east5)',
+      type: 'cloud',
+      status: 'started',
+      llmMetadata: { name: 'vertexai' },
+      models: [{ label: 'claude-sonnet-4-6' }, { label: 'claude-opus-4-5' }],
+      credentials: {
+        projectId: 'my-project',
+        region: 'us-east5',
+        credentialsFile: '~/.config/gcloud/application_default_credentials.json',
+        useVertex: '1',
+      },
+    },
+  ],
+  inferenceProviderConnectionCreation: false,
+} as unknown as ProviderInfo;
+
+test('Expect createAgentWorkspace called with Vertex AI environment and mounts when model is from vertexai provider', async () => {
+  vi.mocked(window.getConfigurationValue).mockImplementation(async (key: string) => {
+    if (key === 'onboarding.defaultAgent') return 'claude';
+    if (key === 'onboarding.defaultWorkspaceSettings')
+      return {
+        defaultAgentSettings: {
+          claude: {
+            defaultModel: {
+              providerId: 'vertex-ai',
+              connectionName: 'my-project (us-east5)',
+              label: 'claude-sonnet-4-6',
+            },
+          },
+        },
+      };
+    return undefined;
+  });
+  vi.mocked(providerStore).providerInfos = writable<ProviderInfo[]>([mockVertexProvider]);
+
+  render(AgentWorkspaceCreate);
+
+  await fireEvent.input(screen.getByPlaceholderText('/path/to/project'), {
+    target: { value: '/home/user/my-repo' },
+  });
+  await fireEvent.click(screen.getByRole('button', { name: 'Use all defaults and create workspace' }));
+
+  expect(window.createAgentWorkspace).toHaveBeenCalledWith(
+    expect.objectContaining({
+      agent: 'claude',
+      environment: [
+        { name: 'ANTHROPIC_VERTEX_PROJECT_ID', value: 'my-project' },
+        { name: 'CLOUD_ML_REGION', value: 'us-east5' },
+        { name: 'CLAUDE_CODE_USE_VERTEX', value: '1' },
+      ],
+      mounts: [
+        {
+          host: '$HOME/.config/gcloud/application_default_credentials.json',
+          target: '$HOME/.config/gcloud/application_default_credentials.json',
+          ro: true,
+        },
+      ],
+    }),
+  );
+});
+
+test('Expect createAgentWorkspace called without environment and mounts for non-vertex model', async () => {
+  vi.mocked(window.getConfigurationValue).mockImplementation(async (key: string) => {
+    if (key === 'onboarding.defaultAgent') return 'claude';
+    if (key === 'onboarding.defaultWorkspaceSettings')
+      return {
+        defaultAgentSettings: {
+          claude: {
+            defaultModel: {
+              providerId: 'claude',
+              connectionName: 'Anthropic Cloud',
+              label: 'claude-sonnet-4',
+            },
+          },
+        },
+      };
+    return undefined;
+  });
+  vi.mocked(providerStore).providerInfos = writable<ProviderInfo[]>([mockAnthropicProvider]);
+
+  render(AgentWorkspaceCreate);
+
+  await fireEvent.input(screen.getByPlaceholderText('/path/to/project'), {
+    target: { value: '/home/user/my-repo' },
+  });
+  await fireEvent.click(screen.getByRole('button', { name: 'Use all defaults and create workspace' }));
+
+  expect(window.createAgentWorkspace).toHaveBeenCalledWith(
+    expect.objectContaining({
+      agent: 'claude',
+      environment: undefined,
+      mounts: undefined,
+    }),
+  );
+});
+
 const wizardStepCount = 5;

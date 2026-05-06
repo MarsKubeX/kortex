@@ -25,9 +25,10 @@ import { providerInfos } from '/@/stores/providers';
 import { ragEnvironments } from '/@/stores/rag-environments';
 import { secretVaultInfos } from '/@/stores/secret-vault';
 import { skillInfos } from '/@/stores/skills';
-import type { NetworkConfiguration } from '/@api/agent-workspace-info';
+import type { EnvironmentVariable, Mount, NetworkConfiguration } from '/@api/agent-workspace-info';
 import { NavigationPage } from '/@api/navigation-page';
 import type { DefaultWorkspaceSettings } from '/@api/onboarding-settings-info';
+import type { ProviderInfo } from '/@api/provider-info';
 
 const fileAccessOptions: FileAccessOption[] = [
   {
@@ -313,6 +314,31 @@ function getFirstCompatibleModel(): ModelInfo | undefined {
   return compatible[0];
 }
 
+function getVertexAiWorkspaceConfig(
+  model: ModelInfo | undefined,
+  providers: ProviderInfo[],
+): { environment: EnvironmentVariable[]; mounts: Mount[] } | undefined {
+  if (model?.llmMetadata?.name !== 'vertexai') return undefined;
+
+  const provider = providers.find(p => p.id === 'vertex-ai');
+  const connection = provider?.inferenceConnections.find(c => c.name === model.connectionName);
+  const creds = connection?.credentials;
+  if (!creds?.projectId || !creds?.region || !creds?.credentialsFile) return undefined;
+
+  const hostPath = creds.credentialsFile.startsWith('~/')
+    ? `$HOME${creds.credentialsFile.slice(1)}`
+    : creds.credentialsFile;
+
+  return {
+    environment: [
+      { name: 'ANTHROPIC_VERTEX_PROJECT_ID', value: creds.projectId },
+      { name: 'CLOUD_ML_REGION', value: creds.region },
+      { name: 'CLAUDE_CODE_USE_VERTEX', value: creds.useVertex ?? '1' },
+    ],
+    mounts: [{ host: hostPath, target: '$HOME/.config/gcloud/application_default_credentials.json', ro: true }],
+  };
+}
+
 async function startWorkspace(): Promise<void> {
   if (!sessionName.trim() || !sourcePath.trim()) return;
 
@@ -337,6 +363,7 @@ async function startWorkspace(): Promise<void> {
         env: m.commandSpec!.env,
       }));
     const hasMcp = remoteServers.length > 0 || commandServers.length > 0;
+    const vertexConfig = getVertexAiWorkspaceConfig(selectedModel, $providerInfos);
 
     await window.createAgentWorkspace({
       sourcePath,
@@ -352,6 +379,8 @@ async function startWorkspace(): Promise<void> {
             ...(commandServers.length > 0 ? { commands: commandServers } : {}),
           }
         : undefined,
+      environment: vertexConfig?.environment,
+      mounts: vertexConfig?.mounts,
     });
   } catch (err: unknown) {
     console.error('Failed to create agent workspace', err);

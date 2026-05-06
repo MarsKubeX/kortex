@@ -56,6 +56,10 @@ export type AgentWorkspaceMcpCommandServer = configComponents['schemas']['McpCom
 
 export type AgentWorkspaceMcpConfig = configComponents['schemas']['McpConfiguration'];
 
+export type EnvironmentVariable = configComponents['schemas']['EnvironmentVariable'];
+
+export type Mount = configComponents['schemas']['Mount'];
+
 /**
  * Options for creating (initializing) a new workspace via `kdn init`.
  */
@@ -70,4 +74,6 @@ export interface AgentWorkspaceCreateOptions {
   network?: NetworkConfiguration;
   secrets?: string[];
   mcp?: AgentWorkspaceMcpConfig;
+  environment?: EnvironmentVariable[];
+  mounts?: Mount[];
 }

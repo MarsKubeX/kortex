@@ -796,6 +796,7 @@ export class ProviderRegistry {
         endpoint: connection.endpoint,
         models: connection.models,
         status: connection.status(),
+        credentials: connection.credentials(),
       };
     } else if (this.isRagConnection(connection)) {
       providerConnection = {

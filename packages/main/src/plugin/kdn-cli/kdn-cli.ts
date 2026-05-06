@@ -135,7 +135,9 @@ export class KdnCli {
     const mcpCommands = options.mcp?.commands;
     const hasSkills = !!options.skills?.length;
     const hasMcp = !!mcpServers?.length || !!mcpCommands?.length;
-    if (!hasSkills && !options.secrets?.length && !options.network && !hasMcp) {
+    const hasEnv = !!options.environment?.length;
+    const hasMounts = !!options.mounts?.length;
+    if (!hasSkills && !options.secrets?.length && !options.network && !hasMcp && !hasEnv && !hasMounts) {
       return;
     }
 
@@ -158,6 +160,12 @@ export class KdnCli {
     }
     existing.network = options.network;
     existing.secrets = options.secrets;
+    if (hasEnv) {
+      existing.environment = options.environment;
+    }
+    if (hasMounts) {
+      existing.mounts = options.mounts;
+    }
 
     if (hasMcp) {
       const reqsByCommand = new Map<string, WorkspaceRequirements | undefined>();

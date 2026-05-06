@@ -82,6 +82,7 @@ export interface ProviderInferenceConnectionInfo {
   models: Array<{
     label: string;
   }>;
+  credentials?: Record<string, string>;
 }
 
 export interface ProviderRagConnectionInfo {

@@ -338,6 +338,7 @@ export class VertexAi implements Disposable {
           projectId: config.projectId,
           region: config.region,
           credentialsFile: config.credentialsFile,
+          useVertex: '1',
         };
       },
     });
