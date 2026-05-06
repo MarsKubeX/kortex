@@ -70,6 +70,26 @@ interface GoogleCloudError {
   };
 }
 
+export class VertexAiApiError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'VertexAiApiError';
+  }
+}
+
+export const FALLBACK_MODELS: InferenceModel[] = [
+  { label: 'claude-opus-4-7' },
+  { label: 'claude-sonnet-4-6' },
+  { label: 'claude-opus-4-6' },
+  { label: 'claude-opus-4-5' },
+  { label: 'claude-sonnet-4-5' },
+  { label: 'claude-haiku-4-5' },
+  { label: 'claude-opus-4-1' },
+];
+
 export class VertexAi implements Disposable {
   private provider: Provider | undefined;
   private connections: Map<string, Disposable> = new Map();
@@ -204,7 +224,7 @@ export class VertexAi implements Disposable {
     });
 
     if (!response.ok) {
-      throw new Error(await this.parseGoogleCloudError(response, projectId, region));
+      throw new VertexAiApiError(await this.parseGoogleCloudError(response, projectId, region), response.status);
     }
 
     const data = (await response.json()) as VertexModelsResponse;
@@ -273,13 +293,12 @@ export class VertexAi implements Disposable {
       await this.removeConnectionConfig(config);
     };
 
-    let status: ProviderConnectionStatus = 'unknown';
+    const status: ProviderConnectionStatus = 'unknown';
     let models: InferenceModel[];
 
     if (validatedModels) {
       models = validatedModels;
     } else {
-      models = [];
       try {
         const creds = await this.readCredentials(config.credentialsFile);
         const accessToken = await this.exchangeToken(creds);
@@ -289,8 +308,11 @@ export class VertexAi implements Disposable {
           models.map(m => m.label),
         );
       } catch (err: unknown) {
-        console.error(`Vertex AI: connection to ${config.projectId}/${config.region} is degraded`, err);
-        status = 'stopped';
+        console.warn(
+          `Vertex AI: could not fetch models for ${config.projectId}/${config.region}, using fallback list`,
+          err,
+        );
+        models = FALLBACK_MODELS;
       }
     }
 
@@ -322,6 +344,8 @@ export class VertexAi implements Disposable {
   /**
    * End-to-end validation: credentials, token exchange, and project/region reachability.
    * Returns the fetched models so the factory can pass them directly to registration.
+   * On 403 (listing permission denied), falls back to a hardcoded model list so that users
+   * who can invoke models but cannot list them can still create a connection.
    */
   private async validateConnection(config: VertexAiConnectionConfig): Promise<InferenceModel[]> {
     const credFile = this.resolveCredentialsPath(config.credentialsFile);
@@ -348,12 +372,22 @@ export class VertexAi implements Disposable {
       throw new Error(`Authentication failed — verify your ADC credentials are current: ${msg}`);
     }
 
-    const models = await this.fetchModels(config.projectId, config.region, accessToken);
-    console.log(
-      `Vertex AI: validated connection — ${models.length} model(s) for ${config.projectId}/${config.region}:`,
-      models.map(m => m.label),
-    );
-    return models;
+    try {
+      const models = await this.fetchModels(config.projectId, config.region, accessToken);
+      console.log(
+        `Vertex AI: validated connection — ${models.length} model(s) for ${config.projectId}/${config.region}:`,
+        models.map(m => m.label),
+      );
+      return models;
+    } catch (err: unknown) {
+      if (err instanceof VertexAiApiError && err.statusCode === 403) {
+        console.warn(
+          `Vertex AI: model listing denied for ${config.projectId}/${config.region}, using fallback model list`,
+        );
+        return FALLBACK_MODELS;
+      }
+      throw err;
+    }
   }
 
   private async factory(params: { [p: string]: unknown }): Promise<void> {
