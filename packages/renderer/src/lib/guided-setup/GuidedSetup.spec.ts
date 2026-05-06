@@ -24,6 +24,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 import { getAgentDefinition } from './agent-registry';
 import type { GuidedSetupStep, OnboardingState } from './guided-setup-steps';
+import { createDefaultOnboardingState } from './guided-setup-steps';
 import GuidedSetup from './GuidedSetup.svelte';
 
 vi.mock(import('./agent-registry'));
@@ -61,7 +62,7 @@ vi.mock(import('./guided-setup-steps'), async importOriginal => {
         isSkippable: false,
       },
     ] satisfies GuidedSetupStep[],
-    createDefaultOnboardingState: (): OnboardingState => ({
+    createDefaultOnboardingState: vi.fn<() => OnboardingState>().mockReturnValue({
       agent: 'opencode',
       workspaceSetting: {},
     }),
@@ -76,6 +77,10 @@ beforeEach(() => {
   vi.mocked(getAgentDefinition).mockReturnValue({ cliName: 'opencode', title: 'OpenCode' } as ReturnType<
     typeof getAgentDefinition
   >);
+  vi.mocked(createDefaultOnboardingState).mockReturnValue({
+    agent: 'opencode',
+    workspaceSetting: {},
+  });
   vi.stubGlobal('updateConfigurationValue', vi.fn().mockResolvedValue(undefined));
 });
 
@@ -308,6 +313,55 @@ test('persists defaultWorkspaceSettings with workspaceConfig when wizard complet
         opencode: {
           defaultModel: undefined,
           workspaceConfiguration: {},
+        },
+      },
+    });
+  });
+});
+
+test('persists vertex AI environment and mounts in workspaceConfiguration', async () => {
+  vi.mocked(getAgentDefinition).mockReturnValue({
+    cliName: 'claude-vertex',
+    cliAgent: 'claude',
+    title: 'Claude on Vertex AI',
+  } as ReturnType<typeof getAgentDefinition>);
+
+  vi.mocked(createDefaultOnboardingState).mockReturnValue({
+    agent: 'claude-vertex',
+    workspaceSetting: {},
+    vertexConfig: {
+      projectId: 'my-project',
+      region: 'us-east5',
+      credentialsPath: '/home/user/.config/gcloud/application_default_credentials.json',
+    },
+  });
+
+  render(GuidedSetup, { onclose: closeMock });
+
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Go to Dashboard/ }));
+
+  await waitFor(() => {
+    expect(window.updateConfigurationValue).toHaveBeenCalledWith('onboarding.defaultWorkspaceSettings', {
+      defaultAgent: 'claude',
+      defaultAgentSettings: {
+        claude: {
+          defaultModel: undefined,
+          workspaceConfiguration: {
+            environment: [
+              { name: 'ANTHROPIC_VERTEX_PROJECT_ID', value: 'my-project' },
+              { name: 'CLOUD_ML_REGION', value: 'us-east5' },
+              { name: 'CLAUDE_CODE_USE_VERTEX', value: '1' },
+            ],
+            mounts: [
+              {
+                host: '/home/user/.config/gcloud/application_default_credentials.json',
+                target: '$HOME/.config/gcloud/application_default_credentials.json',
+                ro: true,
+              },
+            ],
+          },
         },
       },
     });

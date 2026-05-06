@@ -96,6 +96,7 @@ export const agentDefinitions: AgentDefinition[] = [
     colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600',
     modelFilter: 'vertexai',
     panel: ClaudeVertexPanel,
+    providerSelector: 'kaiden.vertex-ai:vertex-ai',
     runtimes: ['podman'],
   },
   {

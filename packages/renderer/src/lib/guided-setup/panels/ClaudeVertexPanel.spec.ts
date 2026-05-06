@@ -18,12 +18,54 @@
 
 import '@testing-library/jest-dom/vitest';
 
+import { faGoogle } from '@fortawesome/free-brands-svg-icons';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
+import type { Writable } from 'svelte/store';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { fetchProviders, providerInfos } from '/@/stores/providers';
+import type { ProviderInfo } from '/@api/provider-info';
+
+import type { AgentDefinition } from '../agent-registry';
 import type { OnboardingState } from '../guided-setup-steps';
 import ClaudeVertexPanel from './ClaudeVertexPanel.svelte';
+
+vi.mock(import('/@/stores/providers'), async () => {
+  const { writable } = await import('svelte/store');
+  return {
+    providerInfos: writable<ProviderInfo[]>([]),
+    fetchProviders: vi.fn().mockResolvedValue([]),
+  };
+});
+
+const vertexDefinition: AgentDefinition = {
+  cliName: 'claude-vertex',
+  cliAgent: 'claude',
+  title: 'Claude on Vertex AI',
+  description: 'Run Claude Code through Google Cloud Vertex AI using your GCP project credentials.',
+  badge: 'Vertex AI',
+  icon: faGoogle,
+  colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600',
+  providerSelector: 'kaiden.vertex-ai:vertex-ai',
+};
+
+function stubVertexProvider(options?: { withModels?: boolean }): void {
+  const models = options?.withModels ? [{ label: 'claude-sonnet-4-6' }, { label: 'claude-opus-4-5' }] : [];
+  const providers = [
+    {
+      id: 'vertex-ai',
+      internalId: 'vertex-ai-internal-1',
+      inferenceConnections: models.length > 0 ? [{ type: 'cloud', status: 'started', models }] : [],
+      inferenceProviderConnectionCreation: true,
+    },
+  ];
+  (providerInfos as Writable<ProviderInfo[]>).set(providers as unknown as ProviderInfo[]);
+}
+
+function stubNoProvider(): void {
+  (providerInfos as Writable<ProviderInfo[]>).set([]);
+}
 
 let onboarding: OnboardingState;
 
@@ -31,12 +73,14 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.resetAllMocks();
   onboarding = { agent: 'claude-vertex', workspaceSetting: {} };
-  vi.stubGlobal('openExternal', vi.fn().mockResolvedValue(undefined));
+  vi.stubGlobal('createInferenceProviderConnection', vi.fn().mockResolvedValue(undefined));
   vi.stubGlobal('openDialog', vi.fn().mockResolvedValue(undefined));
+  vi.stubGlobal('openExternal', vi.fn().mockResolvedValue(undefined));
+  stubVertexProvider();
 });
 
-function renderPanel(): void {
-  render(ClaudeVertexPanel, { onboarding });
+function renderPanel(definition: AgentDefinition = vertexDefinition): void {
+  render(ClaudeVertexPanel, { definition, onboarding });
 }
 
 describe('rendering', () => {
@@ -47,56 +91,42 @@ describe('rendering', () => {
     expect(screen.getByText('Google Cloud Vertex AI')).toBeInTheDocument();
   });
 
-  test('shows the form with environment variable inputs', () => {
+  test('shows the form with project ID, region, and credentials file inputs', () => {
     renderPanel();
 
     expect(screen.getByTestId('claude-vertex-form')).toBeInTheDocument();
-    expect(screen.getByLabelText('ANTHROPIC_VERTEX_PROJECT_ID')).toBeInTheDocument();
-    expect(screen.getByLabelText('CLOUD_ML_REGION')).toBeInTheDocument();
+    expect(screen.getByLabelText('Google Cloud project ID')).toBeInTheDocument();
+    expect(screen.getByLabelText('Region')).toBeInTheDocument();
+    expect(screen.getByLabelText('Credentials file')).toBeInTheDocument();
   });
 
-  test('does not expose CLAUDE_CODE_USE_VERTEX field', () => {
+  test('shows warning when Vertex AI provider extension is not detected', () => {
+    stubNoProvider();
     renderPanel();
 
-    expect(screen.queryByLabelText('CLAUDE_CODE_USE_VERTEX')).not.toBeInTheDocument();
+    expect(screen.getByTestId('vertex-provider-missing')).toBeInTheDocument();
+    expect(screen.getByLabelText('Google Cloud project ID')).toBeDisabled();
+    expect(screen.getByLabelText('Region')).toBeDisabled();
+    expect(screen.getByLabelText('Credentials file')).toBeDisabled();
   });
 
   test('region input defaults to global', () => {
     renderPanel();
 
-    const regionInput = screen.getByLabelText('CLOUD_ML_REGION') as HTMLInputElement;
+    const regionInput = screen.getByLabelText('Region') as HTMLInputElement;
     expect(regionInput.value).toBe('global');
   });
 
-  test('shows informational text about workspace.json mapping', () => {
+  test('shows browse button for credentials file', () => {
     renderPanel();
 
-    expect(screen.getByText(/workspace\.json/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Browse credentials file')).toBeInTheDocument();
   });
 
-  test('shows note about gcloud auth', () => {
+  test('shows Vertex AI documentation link', () => {
     renderPanel();
 
-    expect(screen.getByText(/gcloud auth application-default login/)).toBeInTheDocument();
-  });
-
-  test('shows note about ANTHROPIC_API_KEY not being required', () => {
-    renderPanel();
-
-    expect(screen.getByText(/ANTHROPIC_API_KEY/)).toBeInTheDocument();
-  });
-
-  test('shows credentials directory input with browse button', () => {
-    renderPanel();
-
-    expect(screen.getByLabelText('Google Cloud credentials path')).toBeInTheDocument();
-    expect(screen.getByLabelText('Browse credentials')).toBeInTheDocument();
-  });
-
-  test('shows kdn README link', () => {
-    renderPanel();
-
-    expect(screen.getByText(/kdn README/)).toBeInTheDocument();
+    expect(screen.getByText(/Vertex AI documentation/)).toBeInTheDocument();
   });
 
   test('does not show error message initially', () => {
@@ -126,9 +156,9 @@ describe('beforeAdvance callback', () => {
   test('returns false and shows error when region is empty', async () => {
     renderPanel();
 
-    await userEvent.type(screen.getByLabelText('ANTHROPIC_VERTEX_PROJECT_ID'), 'my-project');
+    await userEvent.type(screen.getByLabelText('Google Cloud project ID'), 'my-project');
 
-    const regionInput = screen.getByLabelText('CLOUD_ML_REGION') as HTMLInputElement;
+    const regionInput = screen.getByLabelText('Region') as HTMLInputElement;
     await userEvent.clear(regionInput);
 
     const result = await onboarding.beforeAdvance!();
@@ -137,111 +167,215 @@ describe('beforeAdvance callback', () => {
     expect(screen.getByText(/Please enter a region/)).toBeInTheDocument();
   });
 
-  test('returns false and shows error when credentials path is empty', async () => {
+  test('returns false and shows error when credentials file is empty', async () => {
     renderPanel();
 
-    await userEvent.type(screen.getByLabelText('ANTHROPIC_VERTEX_PROJECT_ID'), 'my-project');
+    await userEvent.type(screen.getByLabelText('Google Cloud project ID'), 'my-project');
 
     const result = await onboarding.beforeAdvance!();
 
     expect(result).toBe(false);
-    expect(screen.getByText(/Please provide the path to your Google Cloud credentials directory/)).toBeInTheDocument();
+    expect(screen.getByText(/Please provide the path to your gcloud credentials file/)).toBeInTheDocument();
   });
 
-  test('returns true and stores vertexConfig when all inputs are valid', async () => {
+  test('returns false when provider is not available', async () => {
+    stubNoProvider();
     renderPanel();
 
-    await userEvent.type(screen.getByLabelText('ANTHROPIC_VERTEX_PROJECT_ID'), 'my-gcp-project');
-    await userEvent.type(screen.getByLabelText('Google Cloud credentials path'), '/home/user/.config/gcloud');
+    const result = await onboarding.beforeAdvance!();
+
+    expect(result).toBe(false);
+    expect(screen.getByText(/Vertex AI provider extension is not available/)).toBeInTheDocument();
+  });
+
+  test('creates inference connection with factory params when all inputs are valid', async () => {
+    vi.mocked(fetchProviders).mockImplementation(async () => {
+      stubVertexProvider({ withModels: true });
+      return [] as ProviderInfo[];
+    });
+
+    renderPanel();
+
+    await userEvent.type(screen.getByLabelText('Google Cloud project ID'), 'my-gcp-project');
+    await userEvent.type(
+      screen.getByLabelText('Credentials file'),
+      '/home/user/.config/gcloud/application_default_credentials.json',
+    );
 
     const result = await onboarding.beforeAdvance!();
 
     expect(result).toBe(true);
+    expect(window.createInferenceProviderConnection).toHaveBeenCalledWith(
+      'vertex-ai-internal-1',
+      {
+        'vertex-ai.factory.projectId': 'my-gcp-project',
+        'vertex-ai.factory.region': 'global',
+        'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
+      },
+      expect.any(Symbol),
+      expect.any(Function),
+      undefined,
+      undefined,
+    );
+  });
+
+  test('stores vertexConfig in onboarding state on success', async () => {
+    vi.mocked(fetchProviders).mockImplementation(async () => {
+      stubVertexProvider({ withModels: true });
+      return [] as ProviderInfo[];
+    });
+
+    renderPanel();
+
+    await userEvent.type(screen.getByLabelText('Google Cloud project ID'), 'my-gcp-project');
+    await userEvent.type(
+      screen.getByLabelText('Credentials file'),
+      '/home/user/.config/gcloud/application_default_credentials.json',
+    );
+
+    const regionInput = screen.getByLabelText('Region') as HTMLInputElement;
+    await userEvent.clear(regionInput);
+    await userEvent.type(regionInput, 'us-east5');
+
+    await onboarding.beforeAdvance!();
+
     expect(onboarding.vertexConfig).toEqual({
       projectId: 'my-gcp-project',
-      region: 'global',
-      credentialsPath: '/home/user/.config/gcloud',
+      region: 'us-east5',
+      credentialsPath: '/home/user/.config/gcloud/application_default_credentials.json',
     });
   });
 
-  test('stores custom region in vertexConfig', async () => {
+  test('returns false and shows error when inference connection fails', async () => {
+    vi.mocked(window.createInferenceProviderConnection).mockRejectedValue(new Error('Credentials file not found'));
+
     renderPanel();
 
-    await userEvent.type(screen.getByLabelText('ANTHROPIC_VERTEX_PROJECT_ID'), 'my-project');
-    await userEvent.type(screen.getByLabelText('Google Cloud credentials path'), '/home/user/.config/gcloud');
-
-    const regionInput = screen.getByLabelText('CLOUD_ML_REGION') as HTMLInputElement;
-    await userEvent.clear(regionInput);
-    await userEvent.type(regionInput, 'europe-west1');
+    await userEvent.type(screen.getByLabelText('Google Cloud project ID'), 'my-project');
+    await userEvent.type(screen.getByLabelText('Credentials file'), '/bad/path.json');
 
     const result = await onboarding.beforeAdvance!();
 
-    expect(result).toBe(true);
-    expect(onboarding.vertexConfig).toEqual({
-      projectId: 'my-project',
-      region: 'europe-west1',
-      credentialsPath: '/home/user/.config/gcloud',
-    });
+    expect(result).toBe(false);
+    expect(screen.getByText('Credentials file not found')).toBeInTheDocument();
   });
 
   test('trims whitespace from inputs', async () => {
+    vi.mocked(fetchProviders).mockImplementation(async () => {
+      stubVertexProvider({ withModels: true });
+      return [] as ProviderInfo[];
+    });
+
     renderPanel();
 
-    await userEvent.type(screen.getByLabelText('ANTHROPIC_VERTEX_PROJECT_ID'), '  my-project  ');
-    await userEvent.type(screen.getByLabelText('Google Cloud credentials path'), '  /home/user/.config/gcloud  ');
+    await userEvent.type(screen.getByLabelText('Google Cloud project ID'), '  my-project  ');
+    await userEvent.type(screen.getByLabelText('Credentials file'), '  /home/user/creds.json  ');
 
-    const regionInput = screen.getByLabelText('CLOUD_ML_REGION') as HTMLInputElement;
+    const regionInput = screen.getByLabelText('Region') as HTMLInputElement;
     await userEvent.clear(regionInput);
     await userEvent.type(regionInput, '  europe-west1  ');
+
+    await onboarding.beforeAdvance!();
+
+    expect(window.createInferenceProviderConnection).toHaveBeenCalledWith(
+      'vertex-ai-internal-1',
+      {
+        'vertex-ai.factory.projectId': 'my-project',
+        'vertex-ai.factory.region': 'europe-west1',
+        'vertex-ai.factory.credentialsFile': '/home/user/creds.json',
+      },
+      expect.any(Symbol),
+      expect.any(Function),
+      undefined,
+      undefined,
+    );
+  });
+});
+
+describe('already connected', () => {
+  function stubConnectedProvider(): void {
+    const providers = [
+      {
+        id: 'vertex-ai',
+        internalId: 'vertex-ai-internal-1',
+        inferenceConnections: [
+          {
+            type: 'cloud',
+            status: 'started',
+            models: [{ label: 'claude-sonnet-4-6' }, { label: 'claude-opus-4-5' }],
+          },
+        ],
+        inferenceProviderConnectionCreation: true,
+      },
+    ];
+    (providerInfos as Writable<ProviderInfo[]>).set(providers as unknown as ProviderInfo[]);
+  }
+
+  test('shows already-connected message when inference connection with models exists', () => {
+    stubConnectedProvider();
+    renderPanel();
+
+    expect(screen.getByTestId('vertex-already-connected')).toBeInTheDocument();
+    expect(screen.getByText('Connection configured')).toBeInTheDocument();
+    expect(screen.getByText(/2 models/)).toBeInTheDocument();
+  });
+
+  test('hides form when already connected', () => {
+    stubConnectedProvider();
+    renderPanel();
+
+    expect(screen.queryByTestId('claude-vertex-form')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Google Cloud project ID')).not.toBeInTheDocument();
+  });
+
+  test('beforeAdvance returns true immediately when already connected', async () => {
+    stubConnectedProvider();
+    renderPanel();
 
     const result = await onboarding.beforeAdvance!();
 
     expect(result).toBe(true);
-    expect(onboarding.vertexConfig).toEqual({
-      projectId: 'my-project',
-      region: 'europe-west1',
-      credentialsPath: '/home/user/.config/gcloud',
-    });
+    expect(window.createInferenceProviderConnection).not.toHaveBeenCalled();
   });
 });
 
 describe('credentials browse', () => {
   test('opens file dialog when browse button is clicked', async () => {
-    vi.mocked(window.openDialog).mockResolvedValue(['/home/user/.config/gcloud']);
+    vi.mocked(window.openDialog).mockResolvedValue(['/home/user/.config/gcloud/application_default_credentials.json']);
     renderPanel();
 
-    await fireEvent.click(screen.getByLabelText('Browse credentials'));
+    await fireEvent.click(screen.getByLabelText('Browse credentials file'));
 
     expect(window.openDialog).toHaveBeenCalledWith({
-      title: 'Select Google Cloud credentials directory',
-      selectors: ['openDirectory'],
+      title: 'Select gcloud credentials file',
+      selectors: ['openFile'],
     });
   });
 
-  test('sets credentials path from dialog result', async () => {
-    vi.mocked(window.openDialog).mockResolvedValue(['/home/user/.config/gcloud']);
+  test('sets credentials file from dialog result', async () => {
+    vi.mocked(window.openDialog).mockResolvedValue(['/home/user/.config/gcloud/application_default_credentials.json']);
     renderPanel();
 
-    await fireEvent.click(screen.getByLabelText('Browse credentials'));
+    await fireEvent.click(screen.getByLabelText('Browse credentials file'));
 
-    const credInput = screen.getByLabelText('Google Cloud credentials path') as HTMLInputElement;
-    expect(credInput.value).toBe('/home/user/.config/gcloud');
+    const credInput = screen.getByLabelText('Credentials file') as HTMLInputElement;
+    expect(credInput.value).toBe('/home/user/.config/gcloud/application_default_credentials.json');
   });
 
-  test('does not update credentials path when dialog is cancelled', async () => {
+  test('does not update credentials file when dialog is cancelled', async () => {
     vi.mocked(window.openDialog).mockResolvedValue(undefined as unknown as string[]);
     renderPanel();
 
-    await fireEvent.click(screen.getByLabelText('Browse credentials'));
+    await fireEvent.click(screen.getByLabelText('Browse credentials file'));
 
-    const credInput = screen.getByLabelText('Google Cloud credentials path') as HTMLInputElement;
+    const credInput = screen.getByLabelText('Credentials file') as HTMLInputElement;
     expect(credInput.value).toBe('');
   });
 });
 
 describe('cleanup', () => {
   test('clears beforeAdvance when component is destroyed', () => {
-    const { unmount } = render(ClaudeVertexPanel, { onboarding });
+    const { unmount } = render(ClaudeVertexPanel, { definition: vertexDefinition, onboarding });
 
     expect(onboarding.beforeAdvance).toBeDefined();
 
