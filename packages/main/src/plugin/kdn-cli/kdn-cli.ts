@@ -145,7 +145,8 @@ export class KdnCli {
     const mcpCommands = options.mcp?.commands;
     const hasSkills = !!options.skills?.length;
     const hasMcp = !!mcpServers?.length || !!mcpCommands?.length;
-    if (!hasSkills && !options.secrets?.length && !options.network && !hasMcp) {
+    const hasWsConfig = !!options.workspaceConfiguration;
+    if (!hasSkills && !options.secrets?.length && !options.network && !hasMcp && !hasWsConfig) {
       return;
     }
 
@@ -163,11 +164,40 @@ export class KdnCli {
       }
     }
 
+    if (hasWsConfig) {
+      const wc = options.workspaceConfiguration!;
+      if (wc.environment?.length) {
+        const merged = [...(existing.environment ?? []), ...wc.environment];
+        const seen = new Set<string>();
+        existing.environment = merged.filter(e => {
+          if (seen.has(e.name)) return false;
+          seen.add(e.name);
+          return true;
+        });
+      }
+      if (wc.mounts?.length) {
+        const merged = [...(existing.mounts ?? []), ...wc.mounts];
+        const seen = new Set<string>();
+        existing.mounts = merged.filter(m => {
+          const key = `${m.host}::${m.target}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+    }
+
     if (hasSkills) {
       existing.skills = options.skills;
     }
     existing.network = options.network;
-    existing.secrets = options.secrets;
+
+    const wsConfigSecrets = options.workspaceConfiguration?.secrets ?? [];
+    const explicitSecrets = options.secrets ?? [];
+    if (explicitSecrets.length > 0 || wsConfigSecrets.length > 0) {
+      const mergedSecrets = [...new Set([...explicitSecrets, ...wsConfigSecrets])];
+      existing.secrets = mergedSecrets;
+    }
 
     if (hasMcp) {
       const reqsByCommand = new Map<string, WorkspaceRequirements | undefined>();
