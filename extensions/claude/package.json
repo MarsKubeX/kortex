@@ -20,6 +20,11 @@
           "scope": "InferenceProviderConnectionFactory",
           "markdownDescription": "Provide a Claude API key\n\n:button[Grab a key]{href=\"https://console.anthropic.com/settings/keys\"}"
         },
+        "claude.factory.baseURL": {
+          "type": "string",
+          "scope": "InferenceProviderConnectionFactory",
+          "description": "Custom base URL (leave empty for https://api.anthropic.com)"
+        },
         "claude.factory.apiKey": {
           "type": "string",
           "scope": "InferenceProviderConnectionFactory",

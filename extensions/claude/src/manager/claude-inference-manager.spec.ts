@@ -25,7 +25,7 @@ import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ClaudeProviderSymbol, SecretStorageSymbol } from '/@/inject/symbol';
 
-import { ClaudeInferenceManager, TOKENS_KEY } from './claude-inference-manager';
+import { ClaudeInferenceManager, CONNECTION_INFOS_KEY, TOKENS_KEY } from './claude-inference-manager';
 
 vi.mock(import('@ai-sdk/anthropic'));
 
@@ -105,13 +105,30 @@ describe('init', () => {
     });
   });
 
-  test('should restore connections from secret storage', async () => {
-    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue('existingKey');
+  test('should restore connections from new infos key', async () => {
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockImplementation(async (key: string) => {
+      if (key === CONNECTION_INFOS_KEY) return 'existingKey|https://api.anthropic.com';
+      return undefined;
+    });
 
     const manager = await createManager();
     await manager.init();
 
-    expect(SECRET_STORAGE_MOCK.get).toHaveBeenCalledWith(TOKENS_KEY);
+    expect(SECRET_STORAGE_MOCK.get).toHaveBeenCalledWith(CONNECTION_INFOS_KEY);
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledOnce();
+  });
+
+  test('should migrate legacy tokens to new format', async () => {
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockImplementation(async (key: string) => {
+      if (key === TOKENS_KEY) return 'legacyKey';
+      return undefined;
+    });
+
+    const manager = await createManager();
+    await manager.init();
+
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(CONNECTION_INFOS_KEY, 'legacyKey|https://api.anthropic.com');
+    expect(SECRET_STORAGE_MOCK.delete).toHaveBeenCalledWith(TOKENS_KEY);
     expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledOnce();
   });
 
@@ -143,16 +160,16 @@ describe('factory', () => {
     }).rejects.toThrowError('invalid apiKey');
   });
 
-  test('calling create with proper params should save token', async () => {
+  test('calling create with only apiKey should use default baseURL', async () => {
     await create({
       'claude.factory.apiKey': 'dummyKey',
     });
 
     expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledOnce();
-    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(TOKENS_KEY, 'dummyKey');
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(CONNECTION_INFOS_KEY, 'dummyKey|https://api.anthropic.com');
   });
 
-  test('calling create with proper params should register inference connection', async () => {
+  test('calling create with apiKey and default baseURL should not pass baseURL to SDK', async () => {
     await create({
       'claude.factory.apiKey': 'dummyKey',
     });
@@ -180,6 +197,54 @@ describe('factory', () => {
       sdk: ANTHROPIC_PROVIDER_MOCK,
       models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-haiku-3.5-20241022' }],
       credentials: expect.any(Function),
+    });
+  });
+
+  test('calling create with custom baseURL should pass it to SDKs', async () => {
+    await create({
+      'claude.factory.apiKey': 'dummyKey',
+      'claude.factory.baseURL': 'http://localhost:8080',
+    });
+
+    expect(createAnthropic).toHaveBeenCalledOnce();
+    expect(createAnthropic).toHaveBeenCalledWith({
+      apiKey: 'dummyKey',
+      baseURL: 'http://localhost:8080',
+    });
+
+    expect(AnthropicClient).toHaveBeenCalledWith({
+      apiKey: 'dummyKey',
+      baseURL: 'http://localhost:8080',
+    });
+
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(CONNECTION_INFOS_KEY, 'dummyKey|http://localhost:8080');
+
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledOnce();
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith({
+      name: 'http://localhost:8080',
+      type: 'self-hosted',
+      llmMetadata: {
+        name: 'anthropic',
+      },
+      endpoint: 'http://localhost:8080',
+      status: expect.any(Function),
+      lifecycle: {
+        delete: expect.any(Function),
+      },
+      sdk: ANTHROPIC_PROVIDER_MOCK,
+      models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-haiku-3.5-20241022' }],
+      credentials: expect.any(Function),
+    });
+  });
+
+  test('calling create with empty baseURL should use default', async () => {
+    await create({
+      'claude.factory.apiKey': 'dummyKey',
+      'claude.factory.baseURL': '  ',
+    });
+
+    expect(createAnthropic).toHaveBeenCalledWith({
+      apiKey: 'dummyKey',
     });
   });
 });
@@ -211,16 +276,20 @@ describe('connection delete lifecycle', () => {
     mDelete = lifecycle.delete;
   });
 
-  test('calling delete should delete the token', async () => {
+  test('calling delete should remove connection info', async () => {
     await mDelete();
 
     expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledTimes(2);
 
-    // first time when registering the connection
-    expect(SECRET_STORAGE_MOCK.store).toHaveBeenNthCalledWith(1, TOKENS_KEY, 'dummyKey');
+    // first time when saving the connection
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenNthCalledWith(
+      1,
+      CONNECTION_INFOS_KEY,
+      'dummyKey|https://api.anthropic.com',
+    );
 
-    // second time when unregistering the connection
-    expect(SECRET_STORAGE_MOCK.store).toHaveBeenNthCalledWith(2, TOKENS_KEY, '');
+    // second time when removing the connection
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenNthCalledWith(2, CONNECTION_INFOS_KEY, '');
   });
 
   test('calling delete should dispose provider inference connection', async () => {
