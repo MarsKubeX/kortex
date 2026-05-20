@@ -62,7 +62,6 @@ describe('ClaudeExtension', () => {
         icon: expect.objectContaining({ icon: './icon.png' }),
         tags: ['Cloud'],
         isSupportedModelType: expect.any(Function),
-        isSupportedRuntime: expect.any(Function),
       }),
     );
   });
@@ -75,12 +74,11 @@ describe('ClaudeExtension', () => {
     expect(agent.isSupportedModelType!({ name: 'openai' })).toBe(false);
   });
 
-  test('registered agent supports all runtimes', async () => {
+  test('registered agent does not restrict runtimes', async () => {
     await claudeExtension.activate();
 
     const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
-    expect(agent.isSupportedRuntime!('podman')).toBe(true);
-    expect(agent.isSupportedRuntime!('openshell')).toBe(true);
+    expect(agent.isSupportedRuntime).toBeUndefined();
   });
 
   test('activate handles error during container creation', async () => {

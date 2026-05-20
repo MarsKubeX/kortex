@@ -60,7 +60,6 @@ export class ClaudeExtension {
       icon: providerImages,
       tags: ['Cloud'],
       isSupportedModelType: (type): boolean => type.name === 'anthropic',
-      isSupportedRuntime: (): boolean => true,
     });
 
     try {
