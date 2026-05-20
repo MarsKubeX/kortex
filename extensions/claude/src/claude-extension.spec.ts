@@ -17,6 +17,7 @@
  ***********************************************************************/
 
 import type { ExtensionContext } from '@openkaiden/api';
+import { agents } from '@openkaiden/api';
 import type { Container } from 'inversify';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -50,12 +51,54 @@ describe('ClaudeExtension', () => {
     expect(ClaudeInferenceManager.prototype.init).toHaveBeenCalled();
   });
 
+  test('activate registers agent', async () => {
+    await claudeExtension.activate();
+
+    expect(agents.registerAgent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'claude',
+        name: 'Claude Code',
+        description: expect.any(String),
+        icon: expect.objectContaining({ icon: './icon.png' }),
+        tags: ['Cloud'],
+        isSupportedModelType: expect.any(Function),
+        isSupportedRuntime: expect.any(Function),
+      }),
+    );
+  });
+
+  test('registered agent supports anthropic model type', async () => {
+    await claudeExtension.activate();
+
+    const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+    expect(agent.isSupportedModelType!({ name: 'anthropic' })).toBe(true);
+    expect(agent.isSupportedModelType!({ name: 'openai' })).toBe(false);
+  });
+
+  test('registered agent supports all runtimes', async () => {
+    await claudeExtension.activate();
+
+    const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+    expect(agent.isSupportedRuntime!('podman')).toBe(true);
+    expect(agent.isSupportedRuntime!('openshell')).toBe(true);
+  });
+
   test('activate handles error during container creation', async () => {
     const faultyGetAsync = vi.fn().mockRejectedValue(new Error('Container creation failed'));
     vi.spyOn(claudeExtension, 'getContainer').mockReturnValue({
       getAsync: faultyGetAsync,
     } as unknown as Container);
     await expect(claudeExtension.activate()).rejects.toThrow('Container creation failed');
+  });
+
+  test('deactivate disposes agent registration', async () => {
+    const disposeMock = vi.fn();
+    vi.mocked(agents.registerAgent).mockReturnValue({ dispose: disposeMock });
+
+    await claudeExtension.activate();
+    await claudeExtension.deactivate();
+
+    expect(disposeMock).toHaveBeenCalled();
   });
 
   test('deactivate disposes subscriptions', async () => {

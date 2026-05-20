@@ -16,8 +16,8 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ExtensionContext } from '@openkaiden/api';
-import { provider } from '@openkaiden/api';
+import type { Disposable, ExtensionContext } from '@openkaiden/api';
+import { agents, provider } from '@openkaiden/api';
 import type { Container } from 'inversify';
 
 import { InversifyBinding } from '/@/inject/inversify-binding';
@@ -31,23 +31,36 @@ export class ClaudeExtension {
   #container: Container | undefined;
   #claudeSkillsManager: ClaudeSkillsManager | undefined;
   #claudeInferenceManager: ClaudeInferenceManager | undefined;
+  #agentDisposable: Disposable | undefined;
 
   constructor(extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
   }
 
   async activate(): Promise<void> {
+    const providerImages = {
+      icon: './icon.png',
+      logo: {
+        dark: './icon.png',
+        light: './icon.png',
+      },
+    };
+
     const claudeProvider = provider.createProvider({
       name: 'Claude',
       status: 'unknown',
       id: 'claude',
-      images: {
-        icon: './icon.png',
-        logo: {
-          dark: './icon.png',
-          light: './icon.png',
-        },
-      },
+      images: providerImages,
+    });
+
+    this.#agentDisposable = agents.registerAgent({
+      id: 'claude',
+      name: 'Claude Code',
+      description: 'Anthropic cloud agent — connect with an API key to access Claude models.',
+      icon: providerImages,
+      tags: ['Cloud'],
+      isSupportedModelType: (type): boolean => type.name === 'anthropic',
+      isSupportedRuntime: (): boolean => true,
     });
 
     this.#inversifyBinding = new InversifyBinding(claudeProvider, this.#extensionContext);
@@ -76,6 +89,8 @@ export class ClaudeExtension {
   }
 
   async deactivate(): Promise<void> {
+    this.#agentDisposable?.dispose();
+    this.#agentDisposable = undefined;
     await this.#inversifyBinding?.dispose();
     this.#claudeSkillsManager?.dispose();
     this.#claudeSkillsManager = undefined;
