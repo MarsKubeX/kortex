@@ -62,19 +62,25 @@ export class ClaudeExtension {
       isSupportedModelType: (type): boolean => type.name === 'anthropic',
     });
 
+    this.#inversifyBinding = new InversifyBinding(claudeProvider, this.#extensionContext);
+    this.#container = await this.#inversifyBinding.initBindings();
+
     try {
-      this.#inversifyBinding = new InversifyBinding(claudeProvider, this.#extensionContext);
-      this.#container = await this.#inversifyBinding.initBindings();
-
       this.#claudeSkillsManager = await this.getContainer()?.getAsync(ClaudeSkillsManager);
-      this.#claudeInferenceManager = await this.getContainer()?.getAsync(ClaudeInferenceManager);
-
-      await this.#claudeSkillsManager?.init();
-      await this.#claudeInferenceManager?.init();
     } catch (e) {
-      await this.deactivate();
+      console.error('Error while creating the Claude skills manager', e);
       throw e;
     }
+
+    try {
+      this.#claudeInferenceManager = await this.getContainer()?.getAsync(ClaudeInferenceManager);
+    } catch (e) {
+      console.error('Error while creating the Claude inference manager', e);
+      throw e;
+    }
+
+    await this.#claudeSkillsManager?.init();
+    await this.#claudeInferenceManager?.init();
   }
 
   protected getContainer(): Container | undefined {
