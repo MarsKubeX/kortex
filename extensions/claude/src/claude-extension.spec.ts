@@ -91,6 +91,23 @@ describe('ClaudeExtension', () => {
     await expect(claudeExtension.activate()).rejects.toThrow('Container creation failed');
   });
 
+  test('activate cleans up all resources on failure', async () => {
+    const agentDisposeMock = vi.fn();
+    vi.mocked(agents.registerAgent).mockReturnValue({ dispose: agentDisposeMock });
+
+    const faultyGetAsync = vi
+      .fn()
+      .mockResolvedValueOnce(new ClaudeSkillsManager())
+      .mockRejectedValueOnce(new Error('Container creation failed'));
+    vi.spyOn(claudeExtension, 'getContainer').mockReturnValue({
+      getAsync: faultyGetAsync,
+    } as unknown as Container);
+
+    await expect(claudeExtension.activate()).rejects.toThrow('Container creation failed');
+    expect(agentDisposeMock).toHaveBeenCalled();
+    expect(ClaudeSkillsManager.prototype.dispose).toHaveBeenCalled();
+  });
+
   test('deactivate disposes agent registration', async () => {
     const disposeMock = vi.fn();
     vi.mocked(agents.registerAgent).mockReturnValue({ dispose: disposeMock });

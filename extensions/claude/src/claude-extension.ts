@@ -63,25 +63,19 @@ export class ClaudeExtension {
       isSupportedRuntime: (): boolean => true,
     });
 
-    this.#inversifyBinding = new InversifyBinding(claudeProvider, this.#extensionContext);
-    this.#container = await this.#inversifyBinding.initBindings();
-
     try {
+      this.#inversifyBinding = new InversifyBinding(claudeProvider, this.#extensionContext);
+      this.#container = await this.#inversifyBinding.initBindings();
+
       this.#claudeSkillsManager = await this.getContainer()?.getAsync(ClaudeSkillsManager);
-    } catch (e) {
-      console.error('Error while creating the Claude skills manager', e);
-      throw e;
-    }
-
-    try {
       this.#claudeInferenceManager = await this.getContainer()?.getAsync(ClaudeInferenceManager);
+
+      await this.#claudeSkillsManager?.init();
+      await this.#claudeInferenceManager?.init();
     } catch (e) {
-      console.error('Error while creating the Claude inference manager', e);
+      await this.deactivate();
       throw e;
     }
-
-    await this.#claudeSkillsManager?.init();
-    await this.#claudeInferenceManager?.init();
   }
 
   protected getContainer(): Container | undefined {
