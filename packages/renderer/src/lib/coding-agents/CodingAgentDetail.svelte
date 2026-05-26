@@ -176,6 +176,17 @@ function getAgentIconSrc(agent: AgentInfo): string | undefined {
           </p>
         </div>
       </div>
+    {:else}
+      <div class="rounded-xl border border-(--pd-content-card-border) bg-(--pd-content-card-inset-bg) p-6">
+        <div class="flex flex-col items-center text-center py-6">
+          <Icon icon={faTerminal} size="2em" class="text-(--pd-content-card-text) opacity-40 mb-4" />
+          <h2 class="text-base font-semibold text-(--pd-content-card-text) mb-2">No compatible models found</h2>
+          <p class="text-sm text-(--pd-content-card-text) opacity-60 max-w-md">
+            Your providers are connected but no compatible models are available yet.
+            Check the provider settings above or install a model that supports this agent.
+          </p>
+        </div>
+      </div>
     {/if}
   </div>
 </div>

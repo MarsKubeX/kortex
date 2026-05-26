@@ -11,10 +11,10 @@ import CodingAgentDetail from './CodingAgentDetail.svelte';
 let agents: readonly AgentInfo[] = $derived($agentInfos);
 let activeAgentId: string | undefined = $state(undefined);
 
-let activeAgent: AgentInfo | undefined = $derived(activeAgentId ? agents.find(a => a.id === activeAgentId) : agents[0]);
+let activeAgent: AgentInfo | undefined = $derived(agents.find(a => a.id === activeAgentId) ?? agents[0]);
 
 $effect(() => {
-  if (agents.length > 0 && !activeAgentId) {
+  if (agents.length > 0 && (!activeAgentId || !agents.some(a => a.id === activeAgentId))) {
     activeAgentId = agents[0]?.id;
   }
 });
