@@ -2,20 +2,19 @@
 import { faTerminal } from '@fortawesome/free-solid-svg-icons';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 
+import IconImage from '/@/lib/appearance/IconImage.svelte';
 import { agentInfos } from '/@/stores/agents';
-import { isDark } from '/@/stores/appearance';
 import type { AgentInfo } from '/@api/agent-info';
 
 import CodingAgentDetail from './CodingAgentDetail.svelte';
 
-let agents: readonly AgentInfo[] = $derived($agentInfos);
 let activeAgentId: string | undefined = $state(undefined);
 
-let activeAgent: AgentInfo | undefined = $derived(agents.find(a => a.id === activeAgentId) ?? agents[0]);
+let activeAgent: AgentInfo | undefined = $derived($agentInfos.find(a => a.id === activeAgentId) ?? $agentInfos[0]);
 
 $effect(() => {
-  if (agents.length > 0 && (!activeAgentId || !agents.some(a => a.id === activeAgentId))) {
-    activeAgentId = agents[0]?.id;
+  if ($agentInfos.length > 0 && (!activeAgentId || !$agentInfos.some(a => a.id === activeAgentId))) {
+    activeAgentId = $agentInfos[0]?.id;
   }
 });
 
@@ -25,13 +24,6 @@ function selectAgent(agentId: string): void {
 
 function getAgentSubtitle(agent: AgentInfo): string {
   return agent.tags?.join(' · ') ?? '';
-}
-
-function getAgentIconSrc(agent: AgentInfo): string | undefined {
-  const image = agent.icon?.logo ?? agent.icon?.icon;
-  if (!image) return undefined;
-  if (typeof image === 'string') return image;
-  return $isDark ? image.dark : image.light;
 }
 </script>
 
@@ -47,9 +39,8 @@ function getAgentIconSrc(agent: AgentInfo): string | undefined {
       </div>
     </div>
     <div class="h-full overflow-y-auto" style="margin-bottom:auto">
-      {#each agents as agent (agent.id)}
+      {#each $agentInfos as agent (agent.id)}
         {@const isSelected = activeAgent?.id === agent.id}
-        {@const iconSrc = getAgentIconSrc(agent)}
         <button
           type="button"
           class="flex w-full px-3 py-2.5 items-center gap-3 cursor-pointer border-l-4 text-left
@@ -59,11 +50,9 @@ function getAgentIconSrc(agent: AgentInfo): string | undefined {
           aria-label={agent.name}
           onclick={selectAgent.bind(undefined, agent.id)}>
           <div class="shrink-0 w-6 h-6 flex items-center justify-center">
-            {#if iconSrc}
-              <Icon icon={iconSrc} size={20} />
-            {:else}
+            <IconImage image={agent.icon?.logo ?? agent.icon?.icon} alt={agent.name} class="w-5 h-5">
               <Icon icon={faTerminal} size="lg" />
-            {/if}
+            </IconImage>
           </div>
           <div class="flex-1 min-w-0">
             <span class="text-sm font-medium truncate block">{agent.name}</span>
@@ -78,7 +67,7 @@ function getAgentIconSrc(agent: AgentInfo): string | undefined {
     <div class="px-3 py-4 border-t border-(--pd-content-divider)">
       <p class="text-xs font-semibold text-(--pd-content-card-text) opacity-80 uppercase tracking-wide mb-2">About</p>
       <p class="text-[11px] text-(--pd-content-card-text) opacity-60 leading-relaxed">
-        Pick a runtime to edit its defaults for <strong class="text-(--pd-modal-text)">kdn</strong>.
+        Pick an agent to configure its defaults for <strong class="text-(--pd-modal-text)">kdn</strong>.
         Session creation still chooses which agent a workspace uses.
       </p>
     </div>
@@ -89,7 +78,7 @@ function getAgentIconSrc(agent: AgentInfo): string | undefined {
       {#key activeAgent.id}
       <CodingAgentDetail agentInfo={activeAgent} />
       {/key}
-    {:else if agents.length === 0}
+    {:else if $agentInfos.length === 0}
       <div class="flex items-center justify-center h-full">
         <div class="text-center text-(--pd-content-text)">
           <Icon icon={faTerminal} class="mb-3 opacity-40" size="2.5em" />

@@ -3,10 +3,10 @@ import { faTerminal } from '@fortawesome/free-solid-svg-icons';
 import { Button } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 
+import IconImage from '/@/lib/appearance/IconImage.svelte';
 import type { CatalogModelInfo, InferenceConnectionSummary } from '/@/lib/models/models-utils';
 import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
 import ProviderConnectionTiles from '/@/lib/models/ProviderConnectionTiles.svelte';
-import { isDark } from '/@/stores/appearance';
 import { inferenceConnectionSummariesData } from '/@/stores/inference-connection-summaries';
 import { modelKey } from '/@/stores/model-catalog';
 import { catalogModels } from '/@/stores/models';
@@ -31,9 +31,10 @@ let hasModels = $derived(compatibleModels.length > 0);
 
 let configurableConnections: InferenceConnectionSummary[] = $derived.by(() => {
   const all: InferenceConnectionSummary[] = $inferenceConnectionSummariesData.slice();
-  const ownProvider = all.filter(c => c.providerId === agentInfo.id);
-  if (ownProvider.length > 0) return ownProvider;
-  return all;
+  if (agentInfo.supportedModelTypes === undefined) return all;
+  const compatibleProviderIds = new Set(compatibleModels.map(m => m.providerId));
+  if (compatibleProviderIds.size === 0) return all;
+  return all.filter(c => compatibleProviderIds.has(c.providerId));
 });
 
 let savedModelKey = $state('');
@@ -106,28 +107,17 @@ async function saveSelection(): Promise<void> {
   }
 }
 
-let agentIconSrc = $derived(getAgentIconSrc(agentInfo));
-
 function getAgentSubtitle(agent: AgentInfo): string {
   return agent.tags?.join(' · ') ?? '';
-}
-
-function getAgentIconSrc(agent: AgentInfo): string | undefined {
-  const image = agent.icon?.logo ?? agent.icon?.icon;
-  if (!image) return undefined;
-  if (typeof image === 'string') return image;
-  return $isDark ? image.dark : image.light;
 }
 </script>
 
 <div class="flex flex-col h-full overflow-y-auto">
   <div class="pt-6 px-8">
     <div class="flex items-center gap-3 mb-1">
-      {#if agentIconSrc}
-        <Icon icon={agentIconSrc} size={32} />
-      {:else}
+      <IconImage image={agentInfo.icon?.logo ?? agentInfo.icon?.icon} alt={agentInfo.name} class="w-8 h-8">
         <Icon icon={faTerminal} size="2x" />
-      {/if}
+      </IconImage>
       <h1 class="text-2xl font-bold text-(--pd-content-header)">{agentInfo.name}</h1>
     </div>
     {#if getAgentSubtitle(agentInfo)}

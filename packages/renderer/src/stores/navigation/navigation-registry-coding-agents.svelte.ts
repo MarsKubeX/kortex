@@ -20,8 +20,6 @@ import { faTerminal } from '@fortawesome/free-solid-svg-icons/faTerminal';
 
 import type { NavigationRegistryEntry } from './navigation-registry';
 
-const count = $state(0);
-
 export function createNavigationCodingAgentsEntry(): NavigationRegistryEntry {
   const registry: NavigationRegistryEntry = {
     name: 'Coding agents',
@@ -31,7 +29,7 @@ export function createNavigationCodingAgentsEntry(): NavigationRegistryEntry {
     type: 'entry',
 
     get counter() {
-      return count;
+      return 0;
     },
   };
   return registry;
