@@ -655,6 +655,7 @@ declare module '@openkaiden/api' {
   }
 
   export type InferenceProviderConnection = {
+    id: string;
     name: string;
     type: InferenceProviderConnectionType;
     llmMetadata?: LLMMetadata;

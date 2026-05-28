@@ -39,6 +39,7 @@ interface ConnectionInfo {
 export class OpenAI implements Disposable {
   private provider: Provider | undefined = undefined;
   private connections: Map<string, Disposable> = new Map();
+  private connectionIdCounter = 0;
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -188,6 +189,7 @@ export class OpenAI implements Disposable {
     };
 
     const connectionDisposable = this.provider.registerInferenceProviderConnection({
+      id: String(this.connectionIdCounter++),
       name: baseURL,
       type: 'cloud',
       llmMetadata: { name: 'openai' },

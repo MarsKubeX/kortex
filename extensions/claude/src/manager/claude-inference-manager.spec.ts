@@ -168,6 +168,7 @@ describe('factory', () => {
 
     expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledOnce();
     expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith({
+      id: '0',
       name: 'dum*****',
       type: 'cloud',
       llmMetadata: {

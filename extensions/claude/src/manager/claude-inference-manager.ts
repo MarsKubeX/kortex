@@ -37,6 +37,7 @@ export class ClaudeInferenceManager {
   private secrets: SecretStorage;
 
   private connections: Map<string, Disposable> = new Map();
+  private connectionIdCounter = 0;
 
   async init(): Promise<void> {
     this.claudeProvider.setInferenceProviderConnectionFactory({
@@ -109,6 +110,7 @@ export class ClaudeInferenceManager {
     }
 
     const connectionDisposable = this.claudeProvider.registerInferenceProviderConnection({
+      id: String(this.connectionIdCounter++),
       name: this.maskKey(token),
       type: 'cloud',
       llmMetadata: {

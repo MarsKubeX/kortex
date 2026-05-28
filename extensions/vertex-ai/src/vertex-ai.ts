@@ -93,6 +93,7 @@ export const FALLBACK_MODELS: InferenceModel[] = [
 export class VertexAi implements Disposable {
   private provider: Provider | undefined;
   private connections: Map<string, Disposable> = new Map();
+  private connectionIdCounter = 0;
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -320,6 +321,7 @@ export class VertexAi implements Disposable {
     }
 
     const connectionDisposable = this.provider.registerInferenceProviderConnection({
+      id: String(this.connectionIdCounter++),
       name: `${config.projectId} (${config.region})`,
       type: 'cloud',
       llmMetadata: {

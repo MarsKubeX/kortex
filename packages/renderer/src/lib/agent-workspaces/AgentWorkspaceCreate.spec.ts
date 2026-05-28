@@ -59,6 +59,7 @@ function buildCatalogModels(providers: ProviderInfo[]): CatalogModelInfo[] {
         result.push({
           providerId: provider.id,
           providerName: provider.name,
+          connectionId: connection.id ?? '',
           connectionName: connection.name,
           type: connection.type,
           llmMetadata: connection.llmMetadata,
@@ -806,6 +807,7 @@ const mockAnthropicProvider: ProviderInfo = {
   status: 'started',
   inferenceConnections: [
     {
+      id: 'conn-0',
       name: 'Anthropic Cloud',
       type: 'cloud',
       status: 'started',
@@ -823,6 +825,7 @@ const mockOllamaProvider: ProviderInfo = {
   status: 'started',
   inferenceConnections: [
     {
+      id: 'conn-1',
       name: 'Ollama Local',
       type: 'local',
       status: 'started',

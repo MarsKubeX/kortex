@@ -38,6 +38,7 @@ interface ConnectionInfo {
 export class OpenShiftAI implements Disposable {
   private provider: Provider | undefined = undefined;
   private connections: Map<ConnectionInfo, Disposable> = new Map();
+  private connectionIdCounter = 0;
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -263,6 +264,7 @@ export class OpenShiftAI implements Disposable {
       };
 
       const connectionDisposable = this.provider.registerInferenceProviderConnection({
+        id: String(this.connectionIdCounter++),
         name: baseURL,
         type: 'self-hosted',
         endpoint: connectionInfo.baseURL,

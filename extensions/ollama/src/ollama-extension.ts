@@ -40,6 +40,7 @@ export class OllamaExtension {
   #extensionContext: ExtensionContext;
   #currentModels: string[] = [];
   #connectionDisposable: Disposable | undefined;
+  #connectionIdCounter = 0;
   #interval: NodeJS.Timeout | undefined;
 
   constructor(extensionContext: ExtensionContext) {
@@ -118,6 +119,7 @@ export class OllamaExtension {
       if (newModelNames.length > 0) {
         const sdk = createOllama();
         const disposable = ollamaProvider.registerInferenceProviderConnection({
+          id: String(this.#connectionIdCounter++),
           name: 'ollama',
           type: 'local',
           llmMetadata: { name: 'ollama' },

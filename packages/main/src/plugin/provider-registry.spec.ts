@@ -2672,8 +2672,10 @@ describe('getInferenceConnectionCredentials', () => {
       name: id,
       status: 'installed',
     });
+    let counter = 0;
     for (const conn of connections) {
       provider.registerInferenceProviderConnection({
+        id: `${id}-${counter++}`,
         name: conn.name,
         type: 'cloud',
         llmMetadata: { name: conn.llmMetadataName },
