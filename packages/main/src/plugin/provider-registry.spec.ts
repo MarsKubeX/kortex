@@ -2883,6 +2883,6 @@ test('rejects duplicate inference connection id for the same provider', () => {
 
   provider.registerInferenceProviderConnection({ id: 'conn-0', ...base });
   expect(() => provider.registerInferenceProviderConnection({ id: 'conn-0', ...base })).toThrow(
-    "an inference connection with id 'conn-0' is already registered for provider 'provider-a'",
+    /an inference connection with id 'conn-0' is already registered for provider 'provider-a'/,
   );
 });
