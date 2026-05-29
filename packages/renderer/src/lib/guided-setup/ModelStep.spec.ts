@@ -68,7 +68,7 @@ function buildCatalogModels(providers: Partial<ProviderInfo>[]): CatalogModelInf
         result.push({
           providerId: provider.id,
           providerName: provider.name,
-          connectionId: connection.id ?? '',
+          connectionId: connection.id,
           connectionName: connection.name,
           type: connection.type,
           llmMetadata: connection.llmMetadata,
