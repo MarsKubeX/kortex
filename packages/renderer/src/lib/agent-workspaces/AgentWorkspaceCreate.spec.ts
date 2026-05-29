@@ -59,7 +59,7 @@ function buildCatalogModels(providers: ProviderInfo[]): CatalogModelInfo[] {
         result.push({
           providerId: provider.id,
           providerName: provider.name,
-          connectionId: connection.id ?? '',
+          connectionId: connection.id,
           connectionName: connection.name,
           type: connection.type,
           llmMetadata: connection.llmMetadata,
