@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
@@ -28,10 +28,9 @@ import type {
 } from '@openkaiden/api';
 
 export const TOKENS_KEY = 'openai:infos';
-export const TOKEN_SEPARATOR = ',';
-const INFO_SEPARATOR = '|';
 
-interface ConnectionInfo {
+export interface StoredConnection {
+  id: string;
   apiKey: string;
   baseURL: string;
 }
@@ -39,7 +38,6 @@ interface ConnectionInfo {
 export class OpenAI implements Disposable {
   private provider: Provider | undefined = undefined;
   private connections: Map<string, Disposable> = new Map();
-  private connectionIdCounter = 0;
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -65,56 +63,47 @@ export class OpenAI implements Disposable {
   }
 
   private async restoreConnections(): Promise<void> {
-    const connectionInfos = await this.getConnectionInfos();
-    for (const connectionInfo of connectionInfos) {
+    const stored = await this.getStoredConnections();
+    for (const entry of stored) {
       try {
         await this.registerInferenceProviderConnection({
-          token: connectionInfo.apiKey,
-          baseURL: connectionInfo.baseURL,
+          id: entry.id,
+          token: entry.apiKey,
+          baseURL: entry.baseURL,
         });
       } catch (err: unknown) {
-        console.error(`openai: failed to restore connection for baseURL ${connectionInfo.baseURL}`, err);
+        console.error(`openai: failed to restore connection for baseURL ${entry.baseURL}`, err);
       }
     }
   }
 
-  /**
-   * Get all connection infos from secret storage
-   * @private
-   */
-  private async getConnectionInfos(): Promise<ConnectionInfo[]> {
-    // get raw string from secret storage
+  private async getStoredConnections(): Promise<StoredConnection[]> {
     let raw: string | undefined;
     try {
       raw = await this.secrets.get(TOKENS_KEY);
     } catch (err: unknown) {
       console.error('openai: something went wrong while trying to get tokens from secret storage', err);
     }
-    // if undefined return empty array
     if (!raw) return [];
-    // split raw string by token separator
-    return raw.split(TOKEN_SEPARATOR).map(str => {
-      const [apiKey, baseURL] = str.split(INFO_SEPARATOR);
-      return {
-        apiKey,
-        baseURL,
-      };
-    });
+
+    try {
+      return JSON.parse(raw) as StoredConnection[];
+    } catch {
+      // Migrate legacy pipe+comma-separated format (apiKey|baseURL,apiKey|baseURL)
+      const entries = raw.split(',');
+      const migrated: StoredConnection[] = entries.map(str => {
+        const [apiKey, baseURL] = str.split('|');
+        return { id: randomUUID(), apiKey, baseURL };
+      });
+      await this.secrets.store(TOKENS_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
   }
 
-  /**
-   * Save connection info to secret storage
-   * @param apiKey
-   * @param baseURL
-   * @private
-   */
-  private async saveConnectionInfo(apiKey: string, baseURL: string): Promise<void> {
-    // get existing tokens
-    const tokens = (await this.getConnectionInfos()).map(t => `${t.apiKey}|${t.baseURL}`);
-    // concat new token with existing tokens
-    const raw = [...tokens, `${apiKey}${INFO_SEPARATOR}${baseURL}`].join(TOKEN_SEPARATOR);
-    // save to secret storage
-    await this.secrets.store(TOKENS_KEY, raw);
+  private async saveConnection(connection: StoredConnection): Promise<void> {
+    const stored = await this.getStoredConnections();
+    stored.push(connection);
+    await this.secrets.store(TOKENS_KEY, JSON.stringify(stored));
   }
 
   private getTokenHash(token: string): string {
@@ -122,13 +111,10 @@ export class OpenAI implements Disposable {
     return sha256.update(token).digest('hex');
   }
 
-  private async removeConnectionInfo(token: string, baseURL: string): Promise<void> {
-    // get existing tokens
-    const tokens = await this.getConnectionInfos();
-    // filter out the token
-    const raw = tokens.filter(t => t.apiKey !== token || t.baseURL !== baseURL).join(TOKEN_SEPARATOR);
-    // save to secret storage
-    await this.secrets.store(TOKENS_KEY, raw);
+  private async removeConnection(token: string, baseURL: string): Promise<void> {
+    const stored = await this.getStoredConnections();
+    const filtered = stored.filter(entry => entry.apiKey !== token || entry.baseURL !== baseURL);
+    await this.secrets.store(TOKENS_KEY, JSON.stringify(filtered));
   }
 
   protected async listModels(baseURL: string, token: string): Promise<Array<{ label: string }>> {
@@ -147,9 +133,11 @@ export class OpenAI implements Disposable {
   }
 
   private async registerInferenceProviderConnection({
+    id,
     token,
     baseURL,
   }: {
+    id: string;
     token: string;
     baseURL: string;
   }): Promise<void> {
@@ -185,11 +173,11 @@ export class OpenAI implements Disposable {
       // delete map entry
       this.connections.delete(tokenHash);
       // remove token from secret storage
-      await this.removeConnectionInfo(token, baseURL);
+      await this.removeConnection(token, baseURL);
     };
 
     const connectionDisposable = this.provider.registerInferenceProviderConnection({
-      id: String(this.connectionIdCounter++),
+      id,
       name: baseURL,
       type: 'cloud',
       llmMetadata: { name: 'openai' },
@@ -212,21 +200,15 @@ export class OpenAI implements Disposable {
   }
 
   private async inferenceFactory(params: { [p: string]: unknown }): Promise<void> {
-    // extract key from params
     const apiKey = params['openai.factory.apiKey'];
     if (!apiKey || typeof apiKey !== 'string') throw new Error('invalid apiKey');
 
     const baseURL = params['openai.factory.baseURL'];
     if (!baseURL || typeof baseURL !== 'string') throw new Error('invalid baseURL');
 
-    // save the connection info in secret storage
-    await this.saveConnectionInfo(apiKey, baseURL);
-
-    // use dedicated method to register connection
-    await this.registerInferenceProviderConnection({
-      token: apiKey,
-      baseURL: baseURL,
-    });
+    const id = randomUUID();
+    await this.saveConnection({ id, apiKey, baseURL });
+    await this.registerInferenceProviderConnection({ id, token: apiKey, baseURL });
   }
 
   dispose(): void {
