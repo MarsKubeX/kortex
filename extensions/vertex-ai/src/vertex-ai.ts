@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -38,6 +38,10 @@ export interface VertexAiConnectionConfig {
   projectId: string;
   region: string;
   credentialsFile: string;
+}
+
+export interface StoredConnection extends VertexAiConnectionConfig {
+  id: string;
 }
 
 interface AdcCredentials {
@@ -93,7 +97,6 @@ export const FALLBACK_MODELS: InferenceModel[] = [
 export class VertexAi implements Disposable {
   private provider: Provider | undefined;
   private connections: Map<string, Disposable> = new Map();
-  private connectionIdCounter = 0;
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -123,17 +126,17 @@ export class VertexAi implements Disposable {
   }
 
   private async restoreConnections(): Promise<void> {
-    const configs = await this.getConnectionConfigs();
-    for (const config of configs) {
+    const stored = await this.getStoredConnections();
+    for (const entry of stored) {
       try {
-        await this.registerInferenceProviderConnection(config);
+        await this.registerInferenceProviderConnection(entry.id, entry);
       } catch (err: unknown) {
-        console.error(`Vertex AI: failed to restore connection for project ${config.projectId}`, err);
+        console.error(`Vertex AI: failed to restore connection for project ${entry.projectId}`, err);
       }
     }
   }
 
-  private async getConnectionConfigs(): Promise<VertexAiConnectionConfig[]> {
+  private async getStoredConnections(): Promise<StoredConnection[]> {
     let raw: string | undefined;
     try {
       raw = await this.secrets.get(CONNECTIONS_KEY);
@@ -142,22 +145,28 @@ export class VertexAi implements Disposable {
     }
     if (!raw) return [];
     try {
-      return JSON.parse(raw) as VertexAiConnectionConfig[];
+      const parsed = JSON.parse(raw) as Array<VertexAiConnectionConfig & { id?: string }>;
+      if (parsed.some(entry => !entry.id)) {
+        const migrated: StoredConnection[] = parsed.map(entry => ({ ...entry, id: entry.id ?? randomUUID() }));
+        await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(migrated));
+        return migrated;
+      }
+      return parsed as StoredConnection[];
     } catch {
       return [];
     }
   }
 
-  private async saveConnectionConfig(config: VertexAiConnectionConfig): Promise<void> {
-    const configs = await this.getConnectionConfigs();
-    configs.push(config);
-    await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(configs));
+  private async saveConnection(connection: StoredConnection): Promise<void> {
+    const stored = await this.getStoredConnections();
+    stored.push(connection);
+    await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(stored));
   }
 
-  private async removeConnectionConfig(config: VertexAiConnectionConfig): Promise<void> {
-    const configs = await this.getConnectionConfigs();
+  private async removeConnection(config: VertexAiConnectionConfig): Promise<void> {
+    const stored = await this.getStoredConnections();
     const key = this.getConfigHash(config);
-    const filtered = configs.filter(c => this.getConfigHash(c) !== key);
+    const filtered = stored.filter(c => this.getConfigHash(c) !== key);
     await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(filtered));
   }
 
@@ -270,6 +279,7 @@ export class VertexAi implements Disposable {
    * or by fetching them fresh with graceful degradation (restore path).
    */
   private async registerInferenceProviderConnection(
+    id: string,
     config: VertexAiConnectionConfig,
     validatedModels?: InferenceModel[],
   ): Promise<void> {
@@ -294,7 +304,7 @@ export class VertexAi implements Disposable {
     const clean = async (): Promise<void> => {
       this.connections.get(configHash)?.dispose();
       this.connections.delete(configHash);
-      await this.removeConnectionConfig(config);
+      await this.removeConnection(config);
     };
 
     const status: ProviderConnectionStatus = 'unknown';
@@ -321,7 +331,7 @@ export class VertexAi implements Disposable {
     }
 
     const connectionDisposable = this.provider.registerInferenceProviderConnection({
-      id: String(this.connectionIdCounter++),
+      id,
       name: `${config.projectId} (${config.region})`,
       type: 'cloud',
       llmMetadata: {
@@ -416,11 +426,12 @@ export class VertexAi implements Disposable {
 
     const models = await this.validateConnection(config);
 
-    await this.saveConnectionConfig(config);
+    const id = randomUUID();
+    await this.saveConnection({ id, ...config });
     try {
-      await this.registerInferenceProviderConnection(config, models);
+      await this.registerInferenceProviderConnection(id, config, models);
     } catch (err) {
-      await this.removeConnectionConfig(config);
+      await this.removeConnection(config);
       throw err;
     }
   }
