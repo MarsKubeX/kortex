@@ -38,6 +38,7 @@ export interface StoredConnection {
 export class OpenAI implements Disposable {
   private provider: Provider | undefined = undefined;
   private connections: Map<string, Disposable> = new Map();
+  private activeTokenHashes: Set<string> = new Set();
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -111,9 +112,9 @@ export class OpenAI implements Disposable {
     return sha256.update(token).digest('hex');
   }
 
-  private async removeConnection(token: string, baseURL: string): Promise<void> {
+  private async removeConnection(id: string): Promise<void> {
     const stored = await this.getStoredConnections();
-    const filtered = stored.filter(entry => entry.apiKey !== token || entry.baseURL !== baseURL);
+    const filtered = stored.filter(entry => entry.id !== id);
     await this.secrets.store(TOKENS_KEY, JSON.stringify(filtered));
   }
 
@@ -143,10 +144,9 @@ export class OpenAI implements Disposable {
   }): Promise<void> {
     if (!this.provider) throw new Error('cannot create MCP provider connection: provider is not initialized');
 
-    // get hash of the token (used for Map)
     const tokenHash = this.getTokenHash(token);
 
-    if (this.connections.has(tokenHash)) {
+    if (this.activeTokenHashes.has(tokenHash)) {
       throw new Error(`connection already exists for token (hidden) baseURL ${baseURL}`);
     }
 
@@ -159,21 +159,17 @@ export class OpenAI implements Disposable {
       status = 'stopped';
     }
 
-    // create ProviderV2
     const openai = createOpenAICompatible({
       baseURL: baseURL,
       apiKey: token,
       name: baseURL,
     });
 
-    // create a clean method
     const clean = async (): Promise<void> => {
-      // dispose inference provider connection
-      this.connections.get(tokenHash)?.dispose();
-      // delete map entry
-      this.connections.delete(tokenHash);
-      // remove token from secret storage
-      await this.removeConnection(token, baseURL);
+      this.connections.get(id)?.dispose();
+      this.connections.delete(id);
+      this.activeTokenHashes.delete(tokenHash);
+      await this.removeConnection(id);
     };
 
     const connectionDisposable = this.provider.registerInferenceProviderConnection({
@@ -196,7 +192,8 @@ export class OpenAI implements Disposable {
         };
       },
     });
-    this.connections.set(tokenHash, connectionDisposable);
+    this.activeTokenHashes.add(tokenHash);
+    this.connections.set(id, connectionDisposable);
   }
 
   private async inferenceFactory(params: { [p: string]: unknown }): Promise<void> {
@@ -215,5 +212,6 @@ export class OpenAI implements Disposable {
     this.provider?.dispose();
     this.connections.forEach(disposable => disposable.dispose());
     this.connections.clear();
+    this.activeTokenHashes.clear();
   }
 }
