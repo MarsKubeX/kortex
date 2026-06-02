@@ -97,6 +97,7 @@ export const FALLBACK_MODELS: InferenceModel[] = [
 export class VertexAi implements Disposable {
   private provider: Provider | undefined;
   private connections: Map<string, Disposable> = new Map();
+  private activeConfigHashes: Set<string> = new Set();
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -163,10 +164,9 @@ export class VertexAi implements Disposable {
     await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(stored));
   }
 
-  private async removeConnection(config: VertexAiConnectionConfig): Promise<void> {
+  private async removeConnection(id: string): Promise<void> {
     const stored = await this.getStoredConnections();
-    const key = this.getConfigHash(config);
-    const filtered = stored.filter(c => this.getConfigHash(c) !== key);
+    const filtered = stored.filter(c => c.id !== id);
     await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(filtered));
   }
 
@@ -287,7 +287,7 @@ export class VertexAi implements Disposable {
 
     const configHash = this.getConfigHash(config);
 
-    if (this.connections.has(configHash)) {
+    if (this.activeConfigHashes.has(configHash)) {
       throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
     }
 
@@ -302,9 +302,10 @@ export class VertexAi implements Disposable {
     });
 
     const clean = async (): Promise<void> => {
-      this.connections.get(configHash)?.dispose();
-      this.connections.delete(configHash);
-      await this.removeConnection(config);
+      this.connections.get(id)?.dispose();
+      this.connections.delete(id);
+      this.activeConfigHashes.delete(configHash);
+      await this.removeConnection(id);
     };
 
     const status: ProviderConnectionStatus = 'unknown';
@@ -353,7 +354,8 @@ export class VertexAi implements Disposable {
         };
       },
     });
-    this.connections.set(configHash, connectionDisposable);
+    this.activeConfigHashes.add(configHash);
+    this.connections.set(id, connectionDisposable);
   }
 
   /**
@@ -420,7 +422,7 @@ export class VertexAi implements Disposable {
       credentialsFile: credentialsFile.trim(),
     };
 
-    if (this.connections.has(this.getConfigHash(config))) {
+    if (this.activeConfigHashes.has(this.getConfigHash(config))) {
       throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
     }
 
@@ -431,7 +433,7 @@ export class VertexAi implements Disposable {
     try {
       await this.registerInferenceProviderConnection(id, config, models);
     } catch (err) {
-      await this.removeConnection(config);
+      await this.removeConnection(id);
       throw err;
     }
   }
@@ -442,5 +444,6 @@ export class VertexAi implements Disposable {
       disposable.dispose();
     }
     this.connections.clear();
+    this.activeConfigHashes.clear();
   }
 }
