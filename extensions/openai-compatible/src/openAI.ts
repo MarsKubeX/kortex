@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type {
@@ -38,7 +38,6 @@ export interface StoredConnection {
 export class OpenAI implements Disposable {
   private provider: Provider | undefined = undefined;
   private connections: Map<string, Disposable> = new Map();
-  private activeTokenHashes: Set<string> = new Set();
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -107,11 +106,6 @@ export class OpenAI implements Disposable {
     await this.secrets.store(TOKENS_KEY, JSON.stringify(stored));
   }
 
-  private getTokenHash(token: string): string {
-    const sha256 = createHash('sha256');
-    return sha256.update(token).digest('hex');
-  }
-
   private async removeConnection(id: string): Promise<void> {
     const stored = await this.getStoredConnections();
     const filtered = stored.filter(entry => entry.id !== id);
@@ -144,12 +138,6 @@ export class OpenAI implements Disposable {
   }): Promise<void> {
     if (!this.provider) throw new Error('cannot create MCP provider connection: provider is not initialized');
 
-    const tokenHash = this.getTokenHash(token);
-
-    if (this.activeTokenHashes.has(tokenHash)) {
-      throw new Error(`connection already exists for token (hidden) baseURL ${baseURL}`);
-    }
-
     let models: InferenceModel[] = [];
     let status: ProviderConnectionStatus = 'unknown';
 
@@ -168,7 +156,6 @@ export class OpenAI implements Disposable {
     const clean = async (): Promise<void> => {
       this.connections.get(id)?.dispose();
       this.connections.delete(id);
-      this.activeTokenHashes.delete(tokenHash);
       await this.removeConnection(id);
     };
 
@@ -192,7 +179,6 @@ export class OpenAI implements Disposable {
         };
       },
     });
-    this.activeTokenHashes.add(tokenHash);
     this.connections.set(id, connectionDisposable);
   }
 
@@ -203,6 +189,11 @@ export class OpenAI implements Disposable {
     const baseURL = params['openai.factory.baseURL'];
     if (!baseURL || typeof baseURL !== 'string') throw new Error('invalid baseURL');
 
+    const stored = await this.getStoredConnections();
+    if (stored.some(c => c.apiKey === apiKey && c.baseURL === baseURL)) {
+      throw new Error(`connection already exists for baseURL ${baseURL}`);
+    }
+
     const id = randomUUID();
     await this.saveConnection({ id, apiKey, baseURL });
     await this.registerInferenceProviderConnection({ id, token: apiKey, baseURL });
@@ -212,6 +203,5 @@ export class OpenAI implements Disposable {
     this.provider?.dispose();
     this.connections.forEach(disposable => disposable.dispose());
     this.connections.clear();
-    this.activeTokenHashes.clear();
   }
 }

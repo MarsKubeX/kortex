@@ -31,13 +31,7 @@ import { assert, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { OpenAI, type StoredConnection, TOKENS_KEY } from './openAI';
 
-vi.mock(import('node:crypto'), async importOriginal => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    randomUUID: vi.fn().mockReturnValue('fake-uuid-1'),
-  };
-});
+vi.mock(import('node:crypto'));
 
 vi.mock('@openkaiden/api', () => ({
   Disposable: {
@@ -370,8 +364,11 @@ describe('duplicate connection prevention', () => {
 
     await create({ 'openai.factory.apiKey': 'dup', 'openai.factory.baseURL': 'http://dup/v1' });
 
+    const stored: StoredConnection[] = [{ id: 'fake-uuid-1', apiKey: 'dup', baseURL: 'http://dup/v1' }];
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(JSON.stringify(stored));
+
     await expect(
       create({ 'openai.factory.apiKey': 'dup', 'openai.factory.baseURL': 'http://dup/v1' }),
-    ).rejects.toThrowError('connection already exists for token (hidden) baseURL http://dup/v1');
+    ).rejects.toThrowError('connection already exists for baseURL http://dup/v1');
   });
 });
