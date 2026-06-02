@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { createAnthropic } from '@ai-sdk/anthropic';
 import AnthropicClient from '@anthropic-ai/sdk';
@@ -41,7 +41,6 @@ export class ClaudeInferenceManager {
   private secrets: SecretStorage;
 
   private connections: Map<string, Disposable> = new Map();
-  private activeTokenHashes: Set<string> = new Set();
 
   async init(): Promise<void> {
     this.claudeProvider.setInferenceProviderConnectionFactory({
@@ -84,11 +83,6 @@ export class ClaudeInferenceManager {
     await this.secrets.store(TOKENS_KEY, JSON.stringify(stored));
   }
 
-  private getTokenHash(token: string): string {
-    const sha256 = createHash('sha256');
-    return sha256.update(token).digest('hex');
-  }
-
   private async removeConnection(id: string): Promise<void> {
     const stored = await this.getStoredConnections();
     const filtered = stored.filter(entry => entry.id !== id);
@@ -96,13 +90,6 @@ export class ClaudeInferenceManager {
   }
 
   private async registerInferenceProviderConnection({ id, token }: { id: string; token: string }): Promise<void> {
-    const key = this.maskKey(token);
-    const tokenHash = this.getTokenHash(token);
-
-    if (this.activeTokenHashes.has(tokenHash)) {
-      throw new Error(`connection already exists for token ${key}`);
-    }
-
     const anthropic = createAnthropic({
       apiKey: token,
     });
@@ -110,7 +97,6 @@ export class ClaudeInferenceManager {
     const clean = async (): Promise<void> => {
       this.connections.get(id)?.dispose();
       this.connections.delete(id);
-      this.activeTokenHashes.delete(tokenHash);
       await this.removeConnection(id);
     };
 
@@ -144,7 +130,6 @@ export class ClaudeInferenceManager {
         };
       },
     });
-    this.activeTokenHashes.add(tokenHash);
     this.connections.set(id, connectionDisposable);
   }
 
@@ -176,6 +161,5 @@ export class ClaudeInferenceManager {
   dispose(): void {
     this.connections.forEach(disposable => disposable.dispose());
     this.connections.clear();
-    this.activeTokenHashes.clear();
   }
 }
