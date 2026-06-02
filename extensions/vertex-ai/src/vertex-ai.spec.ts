@@ -33,13 +33,7 @@ import {
   type VertexAiConnectionConfig,
 } from './vertex-ai';
 
-vi.mock(import('node:crypto'), async importOriginal => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    randomUUID: vi.fn().mockReturnValue('fake-uuid-1'),
-  };
-});
+vi.mock(import('node:crypto'));
 
 vi.mock(import('node:fs/promises'));
 vi.mock(import('node:os'));
@@ -501,6 +495,16 @@ describe('factory', () => {
       'vertex-ai.factory.region': 'us-east5',
       'vertex-ai.factory.credentialsFile': '/home/user/.config/gcloud/application_default_credentials.json',
     });
+
+    const stored: StoredConnection[] = [
+      {
+        id: 'fake-uuid-1',
+        projectId: 'my-project',
+        region: 'us-east5',
+        credentialsFile: '/home/user/.config/gcloud/application_default_credentials.json',
+      },
+    ];
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(JSON.stringify(stored));
 
     await expect(
       create({

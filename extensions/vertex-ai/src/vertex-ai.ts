@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -97,7 +97,6 @@ export const FALLBACK_MODELS: InferenceModel[] = [
 export class VertexAi implements Disposable {
   private provider: Provider | undefined;
   private connections: Map<string, Disposable> = new Map();
-  private activeConfigHashes: Set<string> = new Set();
 
   constructor(
     private readonly providerAPI: typeof ProviderAPI,
@@ -168,11 +167,6 @@ export class VertexAi implements Disposable {
     const stored = await this.getStoredConnections();
     const filtered = stored.filter(c => c.id !== id);
     await this.secrets.store(CONNECTIONS_KEY, JSON.stringify(filtered));
-  }
-
-  private getConfigHash(config: VertexAiConnectionConfig): string {
-    const sha256 = createHash('sha256');
-    return sha256.update(`${config.projectId}:${config.region}:${config.credentialsFile}`).digest('hex');
   }
 
   private resolveCredentialsPath(credentialsFile: string): string {
@@ -285,12 +279,6 @@ export class VertexAi implements Disposable {
   ): Promise<void> {
     if (!this.provider) throw new Error('Vertex AI provider is not initialized');
 
-    const configHash = this.getConfigHash(config);
-
-    if (this.activeConfigHashes.has(configHash)) {
-      throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
-    }
-
     const credFile = this.resolveCredentialsPath(config.credentialsFile);
 
     const vertexAnthropic = createVertexAnthropic({
@@ -304,7 +292,6 @@ export class VertexAi implements Disposable {
     const clean = async (): Promise<void> => {
       this.connections.get(id)?.dispose();
       this.connections.delete(id);
-      this.activeConfigHashes.delete(configHash);
       await this.removeConnection(id);
     };
 
@@ -354,7 +341,6 @@ export class VertexAi implements Disposable {
         };
       },
     });
-    this.activeConfigHashes.add(configHash);
     this.connections.set(id, connectionDisposable);
   }
 
@@ -422,7 +408,8 @@ export class VertexAi implements Disposable {
       credentialsFile: credentialsFile.trim(),
     };
 
-    if (this.activeConfigHashes.has(this.getConfigHash(config))) {
+    const stored = await this.getStoredConnections();
+    if (stored.some(c => c.projectId === config.projectId && c.region === config.region)) {
       throw new Error(`Connection already exists for project ${config.projectId} in ${config.region}`);
     }
 
@@ -444,6 +431,5 @@ export class VertexAi implements Disposable {
       disposable.dispose();
     }
     this.connections.clear();
-    this.activeConfigHashes.clear();
   }
 }
