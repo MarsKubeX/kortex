@@ -41,6 +41,7 @@ export class ClaudeInferenceManager {
   private secrets: SecretStorage;
 
   private connections: Map<string, Disposable> = new Map();
+  private activeTokenHashes: Set<string> = new Set();
 
   async init(): Promise<void> {
     this.claudeProvider.setInferenceProviderConnectionFactory({
@@ -88,9 +89,9 @@ export class ClaudeInferenceManager {
     return sha256.update(token).digest('hex');
   }
 
-  private async removeConnection(token: string): Promise<void> {
+  private async removeConnection(id: string): Promise<void> {
     const stored = await this.getStoredConnections();
-    const filtered = stored.filter(entry => entry.token !== token);
+    const filtered = stored.filter(entry => entry.id !== id);
     await this.secrets.store(TOKENS_KEY, JSON.stringify(filtered));
   }
 
@@ -98,7 +99,7 @@ export class ClaudeInferenceManager {
     const key = this.maskKey(token);
     const tokenHash = this.getTokenHash(token);
 
-    if (this.connections.has(tokenHash)) {
+    if (this.activeTokenHashes.has(tokenHash)) {
       throw new Error(`connection already exists for token ${key}`);
     }
 
@@ -107,9 +108,10 @@ export class ClaudeInferenceManager {
     });
 
     const clean = async (): Promise<void> => {
-      this.connections.get(tokenHash)?.dispose();
-      this.connections.delete(tokenHash);
-      await this.removeConnection(token);
+      this.connections.get(id)?.dispose();
+      this.connections.delete(id);
+      this.activeTokenHashes.delete(tokenHash);
+      await this.removeConnection(id);
     };
 
     let status: ProviderConnectionStatus = 'unknown';
@@ -142,7 +144,8 @@ export class ClaudeInferenceManager {
         };
       },
     });
-    this.connections.set(tokenHash, connectionDisposable);
+    this.activeTokenHashes.add(tokenHash);
+    this.connections.set(id, connectionDisposable);
   }
 
   private async getAnthropicModels(token: string): Promise<Array<{ label: string }>> {
@@ -173,5 +176,6 @@ export class ClaudeInferenceManager {
   dispose(): void {
     this.connections.forEach(disposable => disposable.dispose());
     this.connections.clear();
+    this.activeTokenHashes.clear();
   }
 }
