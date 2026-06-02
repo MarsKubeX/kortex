@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { createAnthropic } from '@ai-sdk/anthropic';
 import AnthropicClient from '@anthropic-ai/sdk';
@@ -83,33 +83,21 @@ export class ClaudeInferenceManager {
     await this.secrets.store(TOKENS_KEY, JSON.stringify(stored));
   }
 
-  private getTokenHash(token: string): string {
-    const sha256 = createHash('sha256');
-    return sha256.update(token).digest('hex');
-  }
-
-  private async removeConnection(token: string): Promise<void> {
+  private async removeConnection(id: string): Promise<void> {
     const stored = await this.getStoredConnections();
-    const filtered = stored.filter(entry => entry.token !== token);
+    const filtered = stored.filter(entry => entry.id !== id);
     await this.secrets.store(TOKENS_KEY, JSON.stringify(filtered));
   }
 
   private async registerInferenceProviderConnection({ id, token }: { id: string; token: string }): Promise<void> {
-    const key = this.maskKey(token);
-    const tokenHash = this.getTokenHash(token);
-
-    if (this.connections.has(tokenHash)) {
-      throw new Error(`connection already exists for token ${key}`);
-    }
-
     const anthropic = createAnthropic({
       apiKey: token,
     });
 
     const clean = async (): Promise<void> => {
-      this.connections.get(tokenHash)?.dispose();
-      this.connections.delete(tokenHash);
-      await this.removeConnection(token);
+      this.connections.get(id)?.dispose();
+      this.connections.delete(id);
+      await this.removeConnection(id);
     };
 
     let status: ProviderConnectionStatus = 'unknown';
@@ -142,7 +130,7 @@ export class ClaudeInferenceManager {
         };
       },
     });
-    this.connections.set(tokenHash, connectionDisposable);
+    this.connections.set(id, connectionDisposable);
   }
 
   private async getAnthropicModels(token: string): Promise<Array<{ label: string }>> {
