@@ -31,7 +31,6 @@ vi.mock(import('node:os'));
 vi.mock(import('@openkaiden/api'));
 vi.mock(import('ollama-ai-provider-v2'));
 
-// Create a TestOllamaExtension class to expose protected methods if needed
 class TestOllamaExtension extends OllamaExtension {
   public async updateModelsAndStatus(provider: Provider): Promise<void> {
     return super.updateModelsAndStatus(provider);

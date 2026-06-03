@@ -42,12 +42,15 @@ export class OllamaExtension {
   #connectionDisposable: Disposable | undefined;
   #connectionIdCounter = 0;
   #interval: NodeJS.Timeout | undefined;
+  #abortController: AbortController | undefined;
 
   constructor(extensionContext: ExtensionContext) {
     this.#extensionContext = extensionContext;
   }
 
   async activate(): Promise<void> {
+    this.#abortController = new AbortController();
+
     const ollamaProvider = provider.createProvider({
       name: 'Ollama',
       status: 'unknown',
@@ -75,10 +78,13 @@ export class OllamaExtension {
   }
 
   protected async updateModelsAndStatus(ollamaProvider: Provider): Promise<void> {
+    const signal = this.#abortController?.signal;
+    if (signal?.aborted) return;
+
     let models: Array<{ name: string }> = [];
     let running = true;
     try {
-      const res = await fetch('http://localhost:11434/api/tags');
+      const res = await fetch('http://localhost:11434/api/tags', { signal });
       if (!res.ok) {
         throw new Error(`HTTP error, status: ${res.status}`);
       }
@@ -89,15 +95,16 @@ export class OllamaExtension {
             ? data.models
             : []
           : [];
-    } catch (_err: unknown) {
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       running = false;
       models = [];
     }
 
-    // Update provider status
+    if (signal?.aborted) return;
+
     if (!running) {
       ollamaProvider.updateStatus('stopped');
-      // deregister previous connection if exists
       if (this.#connectionDisposable) {
         this.#connectionDisposable.dispose();
         this.#connectionDisposable = undefined;
@@ -113,7 +120,6 @@ export class OllamaExtension {
       newModelNames.length !== oldModelNames.length || newModelNames.some((v, i) => v !== oldModelNames[i]);
 
     if (modelsChanged) {
-      // Unregister previous connection if exists
       if (this.#connectionDisposable) {
         this.#connectionDisposable.dispose();
         this.#connectionDisposable = undefined;
@@ -143,7 +149,13 @@ export class OllamaExtension {
   }
 
   async deactivate(): Promise<void> {
+    this.#abortController?.abort();
+    this.#abortController = undefined;
     clearInterval(this.#interval);
+    if (this.#connectionDisposable) {
+      this.#connectionDisposable.dispose();
+      this.#connectionDisposable = undefined;
+    }
     this.#currentModels = [];
   }
 }

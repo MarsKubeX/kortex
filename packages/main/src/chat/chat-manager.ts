@@ -302,9 +302,11 @@ export class ChatManager {
     userMessage: UIMessage,
     chatId: string,
     placeholderTitle: string,
+    abortSignal?: AbortSignal,
   ): void {
     generateText({
       model,
+      abortSignal,
       prompt: userMessage.parts
         .filter(isTextUIPart)
         .map(p => p.text)
@@ -334,6 +336,7 @@ export class ChatManager {
         }
       })
       .catch((error: unknown) => {
+        if (abortSignal?.aborted) return;
         console.error('Failed to generate chat title', error);
       });
   }
@@ -365,7 +368,7 @@ export class ChatManager {
         const internalProviderId = this.providerRegistry.getMatchingProviderInternalId(params.providerId);
         const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionName);
         const model = sdk.languageModel(params.modelId);
-        this.generateTitleInBackground(model, userMessage, chatId, placeholderTitle);
+        this.generateTitleInBackground(model, userMessage, chatId, placeholderTitle, abortController.signal);
       }
 
       const inferenceComponents = await this.getInferenceComponents(params);
@@ -426,16 +429,17 @@ export class ChatManager {
         })
         .getReader();
 
-      // loop to wait for the stream to finish
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          this.webContents.send('inference:streamText-onChunk', params.onDataId, value);
         }
-        this.webContents.send('inference:streamText-onChunk', params.onDataId, value);
+      } catch (err) {
+        reader.cancel().catch(() => {});
+        throw err;
       }
 
-      // Wait for onFinish message save to complete before signaling stream end
       if (onFinishSavePromise) {
         await onFinishSavePromise;
       }
