@@ -16,34 +16,26 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { AgentWorkspaceMount, NetworkConfiguration } from './agent-workspace-info.js';
-
-export interface FilesystemConfiguration {
-  mode: string;
-  mounts: AgentWorkspaceMount[];
+export function formatGitUrl(url: string): string {
+  return url
+    .trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/\.git$/, '');
 }
 
-export interface WorkspaceProjectInfo {
-  id: string;
-  name: string;
-  description?: string;
-  folder: string;
-  skills: string[];
-  mcpServers: string[];
-  knowledges: string[];
-  secrets: string[];
-  filesystem: FilesystemConfiguration;
-  network: NetworkConfiguration;
+export function extractRepoName(url: string): string {
+  const cleaned = url
+    .trim()
+    .replace(/\.git$/, '')
+    .replace(/\/$/, '');
+  const lastSegment = cleaned.split('/').at(-1) ?? '';
+  return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);
 }
 
-export type WorkspaceProjectCreateOptions = Omit<WorkspaceProjectInfo, 'id'>;
-
-export type WorkspaceProjectUpdateOptions = Partial<Omit<WorkspaceProjectInfo, 'id'>>;
-
-export interface WorkspaceProjectAnalysis {
-  name: string;
-  description?: string;
-  folder: string;
-  gitRepository?: string;
-  gitBranch?: string;
+export function extractRepoSlug(url: string): string {
+  const cleaned = url
+    .trim()
+    .replace(/\.git$/, '')
+    .replace(/\/$/, '');
+  return cleaned.split('/').at(-1) ?? 'project';
 }

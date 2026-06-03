@@ -8,6 +8,7 @@ import { handleNavigation } from '/@/navigation';
 import { NavigationPage } from '/@api/navigation-page';
 import type { WorkspaceProjectAnalysis } from '/@api/workspace-project-info';
 
+import { extractRepoName, extractRepoSlug, formatGitUrl } from './git-url-utils';
 import ProjectCreateStepReview from './ProjectCreateStepReview.svelte';
 import ProjectCreateStepSource from './ProjectCreateStepSource.svelte';
 
@@ -41,30 +42,6 @@ let isReviewStepComplete = $derived.by(() => {
   }
   return projectName.trim() !== '';
 });
-
-function formatGitUrl(url: string): string {
-  return url
-    .trim()
-    .replace(/^https?:\/\//, '')
-    .replace(/\.git$/, '');
-}
-
-function extractRepoName(url: string): string {
-  const cleaned = url
-    .trim()
-    .replace(/\.git$/, '')
-    .replace(/\/$/, '');
-  const lastSegment = cleaned.split('/').at(-1) ?? '';
-  return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);
-}
-
-function extractRepoSlug(url: string): string {
-  const cleaned = url
-    .trim()
-    .replace(/\.git$/, '')
-    .replace(/\/$/, '');
-  return cleaned.split('/').at(-1) ?? 'project';
-}
 
 function goBack(): void {
   if (currentStepIndex > 0) currentStepIndex--;
@@ -119,7 +96,7 @@ async function handleAnalyze(): Promise<void> {
     const result = await window.analyzeWorkspaceProject(path);
     analysis = result;
     projectName = result.name;
-    projectDescription = result.description;
+    projectDescription = result.description ?? '';
     currentStepIndex = 1;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

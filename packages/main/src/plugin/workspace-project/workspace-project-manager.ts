@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -40,7 +40,7 @@ import type {
   WorkspaceProjectUpdateOptions,
 } from '/@api/workspace-project-info.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 @injectable()
 export class WorkspaceProjectManager {
@@ -194,7 +194,7 @@ export class WorkspaceProjectManager {
     }
 
     try {
-      await execAsync(`git clone ${gitUrl} ${resolvedPath}`);
+      await execFileAsync('git', ['clone', gitUrl, resolvedPath]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('Authentication') || message.includes('could not read Username')) {
@@ -213,8 +213,8 @@ export class WorkspaceProjectManager {
 
     try {
       const [remoteResult, branchResult] = await Promise.all([
-        execAsync('git remote get-url origin', { cwd: folderPath }).catch(() => undefined),
-        execAsync('git rev-parse --abbrev-ref HEAD', { cwd: folderPath }).catch(() => undefined),
+        execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: folderPath }).catch(() => undefined),
+        execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: folderPath }).catch(() => undefined),
       ]);
 
       const remote = remoteResult?.stdout.trim();

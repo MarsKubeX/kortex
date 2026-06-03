@@ -6,6 +6,8 @@ import { Icon } from '@podman-desktop/ui-svelte/icons';
 import { Textarea } from '/@/lib/chat/components/ui/textarea';
 import type { WorkspaceProjectAnalysis } from '/@api/workspace-project-info';
 
+import { formatGitUrl } from './git-url-utils';
+
 interface Props {
   analysis: WorkspaceProjectAnalysis | undefined;
   projectName: string;
@@ -88,7 +90,7 @@ let displayFolder = $derived(analysis?.folder ?? '');
         </span>
         <div class="flex items-center gap-2 rounded-lg bg-(--pd-content-card-bg) px-3 py-2.5">
           <Icon icon={faCodeBranch} class="text-(--pd-content-card-text) opacity-50" size="sm" />
-          <span class="text-sm font-mono text-(--pd-content-card-text)">{analysis.gitRepository.replace(/^https?:\/\//, '').replace(/\.git$/, '')}</span>
+          <span class="text-sm font-mono text-(--pd-content-card-text)">{formatGitUrl(analysis.gitRepository)}</span>
           {#if analysis.gitBranch}
             <span class="ml-auto text-xs font-medium bg-(--pd-label-quaternary-bg) text-(--pd-label-quaternary-text) px-2 py-0.5 rounded">
               {analysis.gitBranch}
