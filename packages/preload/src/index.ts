@@ -154,6 +154,7 @@ import type { VolumeInspectInfo, VolumeListInfo } from '/@api/volume-info';
 import type { WebviewInfo } from '/@api/webview-info';
 import type { WelcomeMessages } from '/@api/welcome-info';
 import type {
+  WorkspaceProjectAnalysis,
   WorkspaceProjectCreateOptions,
   WorkspaceProjectInfo,
   WorkspaceProjectUpdateOptions,
@@ -558,6 +559,20 @@ export function initExposure(): void {
     'updateWorkspaceProject',
     async (id: string, options: WorkspaceProjectUpdateOptions): Promise<WorkspaceProjectInfo> => {
       return ipcInvoke('workspace-project-manager:update', id, options);
+    },
+  );
+
+  contextBridge.exposeInMainWorld(
+    'analyzeWorkspaceProject',
+    async (folderPath: string): Promise<WorkspaceProjectAnalysis> => {
+      return ipcInvoke('workspace-project-manager:analyze', folderPath);
+    },
+  );
+
+  contextBridge.exposeInMainWorld(
+    'cloneAndAnalyzeWorkspaceProject',
+    async (gitUrl: string, targetPath: string): Promise<WorkspaceProjectAnalysis> => {
+      return ipcInvoke('workspace-project-manager:clone-and-analyze', gitUrl, targetPath);
     },
   );
 

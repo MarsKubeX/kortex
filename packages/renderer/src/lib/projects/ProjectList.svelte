@@ -1,8 +1,11 @@
 <script lang="ts">
-import { FilteredEmptyScreen, NavPage, Table, TableColumn, TableRow } from '@podman-desktop/ui-svelte';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { Button, FilteredEmptyScreen, NavPage, Table, TableColumn, TableRow } from '@podman-desktop/ui-svelte';
 
 import NoLogIcon from '/@/lib/ui/NoLogIcon.svelte';
+import { handleNavigation } from '/@/navigation';
 import { workspaceProjectInfos } from '/@/stores/workspace-projects';
+import { NavigationPage } from '/@api/navigation-page';
 import type { WorkspaceProjectInfo } from '/@api/workspace-project-info';
 
 import ProjectActions from './columns/ProjectActions.svelte';
@@ -10,6 +13,10 @@ import ProjectFolder from './columns/ProjectFolder.svelte';
 import ProjectName from './columns/ProjectName.svelte';
 import ProjectResources from './columns/ProjectResources.svelte';
 import ProjectEmptyScreen from './ProjectEmptyScreen.svelte';
+
+function navigateToCreate(): void {
+  handleNavigation({ page: NavigationPage.PROJECT_CREATE });
+}
 
 type ProjectSelectable = WorkspaceProjectInfo & { selected: boolean };
 
@@ -52,6 +59,10 @@ const columns = [nameColumn, folderColumn, resourcesColumn, actionsColumn];
 </script>
 
 <NavPage bind:searchTerm={searchTerm} title="Projects">
+  {#snippet additionalActions()}
+    <Button icon={faPlus} onclick={navigateToCreate}>New Project</Button>
+  {/snippet}
+
   {#snippet content()}
     <div class="flex min-w-full h-full">
       {#if filteredProjects.length === 0}

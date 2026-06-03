@@ -212,5 +212,8 @@ export const handleNavigation = (request: InferredNavigationRequest<NavigationPa
     case NavigationPage.PROJECT_DETAILS:
       router.goto(`/projects/${encodeURIComponent(request.parameters.id)}/overview`);
       break;
+    case NavigationPage.PROJECT_CREATE:
+      router.goto('/projects/create');
+      break;
   }
 };

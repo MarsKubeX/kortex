@@ -26,6 +26,7 @@ export interface FilesystemConfiguration {
 export interface WorkspaceProjectInfo {
   id: string;
   name: string;
+  description?: string;
   folder: string;
   skills: string[];
   mcpServers: string[];
@@ -38,3 +39,11 @@ export interface WorkspaceProjectInfo {
 export type WorkspaceProjectCreateOptions = Omit<WorkspaceProjectInfo, 'id'>;
 
 export type WorkspaceProjectUpdateOptions = Partial<Omit<WorkspaceProjectInfo, 'id'>>;
+
+export interface WorkspaceProjectAnalysis {
+  name: string;
+  description: string;
+  folder: string;
+  gitRepository?: string;
+  gitBranch?: string;
+}

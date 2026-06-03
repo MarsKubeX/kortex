@@ -15,6 +15,7 @@ import FlowDetails from '/@/lib/flows/FlowDetails.svelte';
 import FlowList from '/@/lib/flows/FlowList.svelte';
 import KubernetesRoot from '/@/lib/kube/KubernetesRoot.svelte';
 import MCPDetails from '/@/lib/mcp/MCPDetails.svelte';
+import ProjectCreate from '/@/lib/projects/ProjectCreate.svelte';
 import ProjectDetails from '/@/lib/projects/ProjectDetails.svelte';
 import ProjectList from '/@/lib/projects/ProjectList.svelte';
 import RAGEnvironmentDetails from '/@/lib/rag/RAGEnvironmentDetails.svelte';
@@ -271,6 +272,9 @@ tablePersistence.storage = new PodmanDesktopStoragePersist();
         <Route path="/projects/*" breadcrumb="Projects" navigationHint="root" firstmatch>
           <Route path="/" breadcrumb="Projects" navigationHint="root">
             <ProjectList />
+          </Route>
+          <Route path="/create" breadcrumb="New Project">
+            <ProjectCreate />
           </Route>
           <Route path="/:id/*" breadcrumb="Project Details" let:meta navigationHint="details">
             <ProjectDetails projectId={decodeURIComponent(meta.params.id)} />

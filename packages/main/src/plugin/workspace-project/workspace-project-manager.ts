@@ -16,9 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
+import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { inject, injectable, preDestroy } from 'inversify';
 
@@ -31,10 +34,13 @@ import { SkillManager } from '/@/plugin/skill/skill-manager.js';
 import { ApiSenderType } from '/@api/api-sender/api-sender-type.js';
 import type { IDisposable } from '/@api/disposable.js';
 import type {
+  WorkspaceProjectAnalysis,
   WorkspaceProjectCreateOptions,
   WorkspaceProjectInfo,
   WorkspaceProjectUpdateOptions,
 } from '/@api/workspace-project-info.js';
+
+const execAsync = promisify(exec);
 
 @injectable()
 export class WorkspaceProjectManager {
@@ -85,6 +91,20 @@ export class WorkspaceProjectManager {
       'workspace-project-manager:update',
       async (_listener: unknown, id: string, options: WorkspaceProjectUpdateOptions): Promise<WorkspaceProjectInfo> => {
         return this.update(id, options);
+      },
+    );
+
+    this.ipcHandle(
+      'workspace-project-manager:analyze',
+      async (_listener: unknown, folderPath: string): Promise<WorkspaceProjectAnalysis> => {
+        return this.analyze(folderPath);
+      },
+    );
+
+    this.ipcHandle(
+      'workspace-project-manager:clone-and-analyze',
+      async (_listener: unknown, gitUrl: string, targetPath: string): Promise<WorkspaceProjectAnalysis> => {
+        return this.cloneAndAnalyze(gitUrl, targetPath);
       },
     );
 
@@ -142,6 +162,68 @@ export class WorkspaceProjectManager {
     this.projects.set(id, updated);
     this.apiSender.send('workspace-project-update');
     return updated;
+  }
+
+  async analyze(folderPath: string): Promise<WorkspaceProjectAnalysis> {
+    if (!existsSync(folderPath)) {
+      throw new Error(`Path "${folderPath}" does not exist`);
+    }
+
+    const name = basename(folderPath) || folderPath;
+    const gitInfo = await this.detectGitInfo(folderPath);
+
+    return {
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      description: 'Auto-detected project from local working directory.',
+      folder: folderPath,
+      gitRepository: gitInfo?.remote,
+      gitBranch: gitInfo?.branch,
+    };
+  }
+
+  async cloneAndAnalyze(gitUrl: string, targetPath: string): Promise<WorkspaceProjectAnalysis> {
+    const resolvedPath = this.resolveHomePath(targetPath);
+
+    if (existsSync(resolvedPath)) {
+      throw new Error(`Target path "${resolvedPath}" already exists`);
+    }
+
+    const parentDir = join(resolvedPath, '..');
+    if (!existsSync(parentDir)) {
+      throw new Error(`Parent directory "${parentDir}" does not exist`);
+    }
+
+    try {
+      await execAsync(`git clone ${gitUrl} ${resolvedPath}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('Authentication') || message.includes('could not read Username')) {
+        throw new Error('Authentication failed. Make sure you can clone this repository from your terminal.');
+      }
+      throw new Error(`Failed to clone repository: ${message}`);
+    }
+
+    return this.analyze(resolvedPath);
+  }
+
+  private async detectGitInfo(folderPath: string): Promise<{ remote?: string; branch?: string } | undefined> {
+    if (!existsSync(join(folderPath, '.git'))) {
+      return undefined;
+    }
+
+    try {
+      const [remoteResult, branchResult] = await Promise.all([
+        execAsync('git remote get-url origin', { cwd: folderPath }).catch(() => undefined),
+        execAsync('git rev-parse --abbrev-ref HEAD', { cwd: folderPath }).catch(() => undefined),
+      ]);
+
+      const remote = remoteResult?.stdout.trim();
+      const branch = branchResult?.stdout.trim();
+
+      return { remote: remote ?? undefined, branch: branch ?? undefined };
+    } catch {
+      return undefined;
+    }
   }
 
   private async validateReferences(options: WorkspaceProjectCreateOptions | WorkspaceProjectInfo): Promise<void> {
@@ -255,6 +337,13 @@ export class WorkspaceProjectManager {
       throw new Error('Invalid workspace project id');
     }
     return normalized;
+  }
+
+  private resolveHomePath(inputPath: string): string {
+    if (inputPath.startsWith('~/')) {
+      return join(homedir(), inputPath.slice(2));
+    }
+    return inputPath;
   }
 
   private getFilePath(id: string): string {
