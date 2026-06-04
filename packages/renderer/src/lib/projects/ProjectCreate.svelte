@@ -60,6 +60,9 @@ async function handleBrowseSource(): Promise<void> {
     const selected = result?.[0];
     if (selected) {
       sourcePath = selected;
+      analysis = undefined;
+      projectName = '';
+      projectDescription = '';
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
