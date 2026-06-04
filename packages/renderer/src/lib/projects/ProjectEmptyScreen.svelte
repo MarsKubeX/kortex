@@ -15,5 +15,7 @@ function navigateToCreate(): void {
   <span class="text-(--pd-content-text)">
     Projects will appear here once created.
   </span>
-  <Button icon={faPlus} onclick={navigateToCreate}>New Project</Button>
+  <div class="mt-4">
+    <Button icon={faPlus} onclick={navigateToCreate}>New Project</Button>
+  </div>
 </EmptyScreen>

@@ -16,24 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-function normalizeGitRepoPath(url: string): string {
-  return url
-    .trim()
-    .replace(/\/+$/, '')
-    .replace(/\.git$/, '');
-}
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
-export function formatGitUrl(url: string): string {
-  return normalizeGitRepoPath(url).replace(/^https?:\/\//, '');
-}
-
-export function extractRepoName(url: string): string {
-  const cleaned = normalizeGitRepoPath(url);
-  const lastSegment = cleaned.split('/').at(-1) ?? '';
-  return lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);
-}
-
-export function extractRepoSlug(url: string): string {
-  const cleaned = normalizeGitRepoPath(url);
-  return cleaned.split('/').at(-1) ?? 'project';
+export function resolveHomePath(inputPath: string): string {
+  if (inputPath.startsWith('~/')) {
+    return join(homedir(), inputPath.slice(2));
+  }
+  return inputPath;
 }

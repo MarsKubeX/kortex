@@ -19,7 +19,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -31,6 +30,8 @@ import { MCPManager } from '/@/plugin/mcp/mcp-manager.js';
 import { RagEnvironmentRegistry } from '/@/plugin/rag-environment-registry.js';
 import { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
 import { SkillManager } from '/@/plugin/skill/skill-manager.js';
+import { TaskManager } from '/@/plugin/tasks/task-manager.js';
+import { resolveHomePath } from '/@/plugin/util/resolve-home-path.js';
 import { ApiSenderType } from '/@api/api-sender/api-sender-type.js';
 import type { IDisposable } from '/@api/disposable.js';
 import type {
@@ -55,6 +56,7 @@ export class WorkspaceProjectManager {
     @inject(MCPManager) private readonly mcpManager: MCPManager,
     @inject(SecretManager) private readonly secretManager: SecretManager,
     @inject(RagEnvironmentRegistry) private readonly ragEnvironmentRegistry: RagEnvironmentRegistry,
+    @inject(TaskManager) private readonly taskManager: TaskManager,
   ) {}
 
   async init(): Promise<void> {
@@ -165,24 +167,26 @@ export class WorkspaceProjectManager {
   }
 
   async analyze(folderPath: string): Promise<WorkspaceProjectAnalysis> {
-    if (!existsSync(folderPath)) {
-      throw new Error(`Path "${folderPath}" does not exist`);
+    const resolvedPath = resolveHomePath(folderPath);
+
+    if (!existsSync(resolvedPath)) {
+      throw new Error(`Path "${resolvedPath}" does not exist`);
     }
 
-    const name = basename(folderPath) || folderPath;
-    const gitInfo = await this.detectGitInfo(folderPath);
+    const name = basename(resolvedPath) || resolvedPath;
+    const gitInfo = await this.detectGitInfo(resolvedPath);
 
     return {
       name: name.charAt(0).toUpperCase() + name.slice(1),
       description: 'Auto-detected project from local working directory.',
-      folder: folderPath,
+      folder: resolvedPath,
       gitRepository: gitInfo?.remote,
       gitBranch: gitInfo?.branch,
     };
   }
 
   async cloneAndAnalyze(gitUrl: string, targetPath: string): Promise<WorkspaceProjectAnalysis> {
-    const resolvedPath = this.resolveHomePath(targetPath);
+    const resolvedPath = resolveHomePath(targetPath);
 
     if (existsSync(resolvedPath)) {
       throw new Error(`Target path "${resolvedPath}" already exists`);
@@ -193,14 +197,23 @@ export class WorkspaceProjectManager {
       throw new Error(`Parent directory "${parentDir}" does not exist`);
     }
 
+    const task = this.taskManager.createTask({ title: `Cloning repository ${gitUrl}` });
+
     try {
       await execFileAsync('git', ['clone', gitUrl, resolvedPath]);
+      task.status = 'success';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('Authentication') || message.includes('could not read Username')) {
+        task.error = 'Authentication failed';
+        task.status = 'failure';
         throw new Error('Authentication failed. Make sure you can clone this repository from your terminal.');
       }
+      task.error = `Failed to clone repository: ${message}`;
+      task.status = 'failure';
       throw new Error(`Failed to clone repository: ${message}`);
+    } finally {
+      task.state = 'completed';
     }
 
     return this.analyze(resolvedPath);
@@ -212,18 +225,37 @@ export class WorkspaceProjectManager {
     }
 
     try {
-      const [remoteResult, branchResult] = await Promise.all([
-        execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: folderPath }).catch(() => undefined),
+      const [remoteUrl, branchResult] = await Promise.all([
+        this.getGitRemoteUrl(folderPath),
         execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: folderPath }).catch(() => undefined),
       ]);
 
-      const remote = remoteResult?.stdout.trim();
       const branch = branchResult?.stdout.trim();
 
-      return { remote: remote ?? undefined, branch: branch ?? undefined };
+      return { remote: remoteUrl ?? undefined, branch: branch ?? undefined };
     } catch {
       return undefined;
     }
+  }
+
+  private async getGitRemoteUrl(folderPath: string): Promise<string | undefined> {
+    const originResult = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: folderPath }).catch(
+      () => undefined,
+    );
+    if (originResult?.stdout.trim()) {
+      return originResult.stdout.trim();
+    }
+
+    const remotesResult = await execFileAsync('git', ['remote'], { cwd: folderPath }).catch(() => undefined);
+    const firstRemote = remotesResult?.stdout.trim().split('\n')[0];
+    if (!firstRemote) {
+      return undefined;
+    }
+
+    const result = await execFileAsync('git', ['remote', 'get-url', firstRemote], { cwd: folderPath }).catch(
+      () => undefined,
+    );
+    return result?.stdout.trim() ?? undefined;
   }
 
   private async validateReferences(options: WorkspaceProjectCreateOptions | WorkspaceProjectInfo): Promise<void> {
@@ -337,13 +369,6 @@ export class WorkspaceProjectManager {
       throw new Error('Invalid workspace project id');
     }
     return normalized;
-  }
-
-  private resolveHomePath(inputPath: string): string {
-    if (inputPath.startsWith('~/')) {
-      return join(homedir(), inputPath.slice(2));
-    }
-    return inputPath;
   }
 
   private getFilePath(id: string): string {

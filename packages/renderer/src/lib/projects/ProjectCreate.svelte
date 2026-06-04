@@ -48,6 +48,9 @@ function goBack(): void {
 }
 
 function handleStepClick(index: number): void {
+  if (index > currentStepIndex && !isGitSource && !analysis) {
+    return;
+  }
   currentStepIndex = index;
 }
 
@@ -122,7 +125,10 @@ async function createProject(): Promise<void> {
       const result = await window.cloneAndAnalyzeWorkspaceProject(gitUrl.trim(), cloneTo.trim());
       folder = result.folder;
     } else {
-      folder = analysis?.folder ?? sourcePath.trim();
+      if (!analysis) {
+        throw new Error('Please analyze the selected working directory before creating the project.');
+      }
+      folder = analysis.folder;
     }
 
     await window.createWorkspaceProject({
@@ -202,7 +208,11 @@ async function createProject(): Promise<void> {
                 </Button>
               {:else if isLastStep}
                 <Button disabled={!isReviewStepComplete || creating} onclick={createProject}>
-                  {creating ? 'Creating...' : 'Create Project'}
+                  {#if creating}
+                    {isGitSource ? 'Cloning & Creating...' : 'Creating...'}
+                  {:else}
+                    Create Project
+                  {/if}
                 </Button>
               {/if}
             </div>
