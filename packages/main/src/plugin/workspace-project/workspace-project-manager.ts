@@ -197,7 +197,7 @@ export class WorkspaceProjectManager {
       throw new Error(`Parent directory "${parentDir}" does not exist`);
     }
 
-    const task = this.taskManager.createTask({ title: `Cloning repository ${gitUrl}` });
+    const task = this.taskManager.createTask({ title: 'Cloning repository' });
 
     try {
       await execFileAsync('git', ['clone', gitUrl, resolvedPath]);
@@ -247,7 +247,7 @@ export class WorkspaceProjectManager {
     }
 
     const remotesResult = await execFileAsync('git', ['remote'], { cwd: folderPath }).catch(() => undefined);
-    const firstRemote = remotesResult?.stdout.trim().split('\n')[0];
+    const firstRemote = remotesResult?.stdout.trim().split(/\r?\n/)[0];
     if (!firstRemote) {
       return undefined;
     }

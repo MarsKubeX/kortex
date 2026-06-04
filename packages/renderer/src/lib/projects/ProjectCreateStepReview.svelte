@@ -108,9 +108,6 @@ let displayFolder = $derived(analysis?.folder ?? '');
       <div class="flex items-center gap-2 rounded-lg bg-(--pd-content-card-bg) px-3 py-2.5">
         <Icon icon={faCodeBranch} class="text-(--pd-content-card-text) opacity-50" size="sm" />
         <span class="text-sm font-mono text-(--pd-content-card-text)">{gitRepoDisplay}</span>
-        <span class="ml-auto text-xs font-medium bg-(--pd-label-quaternary-bg) text-(--pd-label-quaternary-text) px-2 py-0.5 rounded">
-          default
-        </span>
       </div>
     </div>
 

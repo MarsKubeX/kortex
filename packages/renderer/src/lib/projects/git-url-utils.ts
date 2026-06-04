@@ -35,5 +35,6 @@ export function extractRepoName(url: string): string {
 
 export function extractRepoSlug(url: string): string {
   const cleaned = normalizeGitRepoPath(url);
-  return cleaned.split('/').at(-1) ?? 'project';
+  const lastSegment = cleaned.split('/').at(-1);
+  return lastSegment && lastSegment.length > 0 ? lastSegment : 'project';
 }
