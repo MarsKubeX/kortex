@@ -75,6 +75,7 @@ import { OpenshellGateway } from '/@/plugin/openshell-cli/openshell-gateway.js';
 import { RagEnvironmentRegistry } from '/@/plugin/rag-environment-registry.js';
 import { SchedulerRegistry } from '/@/plugin/scheduler/scheduler-registry.js';
 import { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
+import { SemanticRouterManager } from '/@/plugin/semantic-router/semantic-router-manager.js';
 import { SkillManager } from '/@/plugin/skill/skill-manager.js';
 import { TaskManager } from '/@/plugin/tasks/task-manager.js';
 import { Uri } from '/@/plugin/types/uri.js';
@@ -597,6 +598,7 @@ export class PluginSystem {
     container.bind<FlowManager>(FlowManager).toSelf().inSingletonScope();
     container.bind<SkillManager>(SkillManager).toSelf().inSingletonScope();
     container.bind<WorkspaceProjectManager>(WorkspaceProjectManager).toSelf().inSingletonScope();
+    container.bind<SemanticRouterManager>(SemanticRouterManager).toSelf().inSingletonScope();
     container.bind<TrayMenuRegistry>(TrayMenuRegistry).toSelf().inSingletonScope();
     container.bind<InputQuickPickRegistry>(InputQuickPickRegistry).toSelf().inSingletonScope();
     container.bind<FilesystemMonitoring>(FilesystemMonitoring).toSelf().inSingletonScope();
@@ -914,6 +916,9 @@ export class PluginSystem {
 
     const workspaceProjectManager = container.get<WorkspaceProjectManager>(WorkspaceProjectManager);
     await workspaceProjectManager.init();
+
+    const semanticRouterManager = container.get<SemanticRouterManager>(SemanticRouterManager);
+    await semanticRouterManager.init();
 
     const mcpIPCHandler = container.get<MCPIPCHandler>(MCPIPCHandler);
     mcpIPCHandler.init();
