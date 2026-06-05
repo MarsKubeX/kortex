@@ -840,8 +840,8 @@ importers:
   extensions/vertex-ai:
     dependencies:
       '@ai-sdk/google-vertex':
-        specifier: ^4.0.140
-        version: 4.0.140(zod@4.4.3)
+        specifier: ^4.0.142
+        version: 4.0.142(zod@4.4.3)
       '@openkaiden/api':
         specifier: workspace:*
         version: link:../../packages/extension-api
@@ -1112,8 +1112,8 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/google-vertex@4.0.140':
-    resolution: {integrity: sha512-Fz3STER9hcrY0uJ6wMg8tSasS5+FbLnBU9N89cw9KBkSUtq+Hefeert7y/UA7RUgPS+d6Z+kzmkqbdAU5dn+oA==}
+  '@ai-sdk/google-vertex@4.0.142':
+    resolution: {integrity: sha512-bTWfj0ITBHjAVJHWCA0DB7PO+aDX8bWxTI9hpNAKH7e5uO74URKdi22zlQAOsROEufcLYiAw0LjrYmmXiksErw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -8088,7 +8088,7 @@ snapshots:
       '@vercel/oidc': 3.2.0
       zod: 4.4.3
 
-  '@ai-sdk/google-vertex@4.0.140(zod@4.4.3)':
+  '@ai-sdk/google-vertex@4.0.142(zod@4.4.3)':
     dependencies:
       '@ai-sdk/anthropic': 3.0.81(zod@4.4.3)
       '@ai-sdk/google': 3.0.80(zod@4.4.3)
