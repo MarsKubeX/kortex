@@ -28,6 +28,7 @@ import type { MCPManager } from '/@/plugin/mcp/mcp-manager.js';
 import type { RagEnvironmentRegistry } from '/@/plugin/rag-environment-registry.js';
 import type { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
 import type { SkillManager } from '/@/plugin/skill/skill-manager.js';
+import type { TaskManager } from '/@/plugin/tasks/task-manager.js';
 import type { ApiSenderType } from '/@api/api-sender/api-sender-type.js';
 import type { WorkspaceProjectCreateOptions, WorkspaceProjectInfo } from '/@api/workspace-project-info.js';
 
@@ -79,6 +80,10 @@ const ragEnvironmentRegistry = {
   getAllRagEnvironments: vi.fn().mockResolvedValue([{ name: 'knowledge-a' }, { name: 'knowledge-b' }]),
 } as unknown as RagEnvironmentRegistry;
 
+const taskManager = {
+  createTask: vi.fn().mockReturnValue({ state: 'running', status: 'in-progress', progress: undefined, error: '' }),
+} as unknown as TaskManager;
+
 function createManager(): WorkspaceProjectManager {
   return new WorkspaceProjectManager(
     apiSender,
@@ -88,6 +93,7 @@ function createManager(): WorkspaceProjectManager {
     mcpManager,
     secretManager,
     ragEnvironmentRegistry,
+    taskManager,
   );
 }
 

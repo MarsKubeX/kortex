@@ -16,34 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { AgentWorkspaceMount, NetworkConfiguration } from './agent-workspace-info.js';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
-export interface FilesystemConfiguration {
-  mode: string;
-  mounts: AgentWorkspaceMount[];
-}
-
-export interface WorkspaceProjectInfo {
-  id: string;
-  name: string;
-  description?: string;
-  folder: string;
-  skills: string[];
-  mcpServers: string[];
-  knowledges: string[];
-  secrets: string[];
-  filesystem: FilesystemConfiguration;
-  network: NetworkConfiguration;
-}
-
-export type WorkspaceProjectCreateOptions = Omit<WorkspaceProjectInfo, 'id'>;
-
-export type WorkspaceProjectUpdateOptions = Partial<Omit<WorkspaceProjectInfo, 'id'>>;
-
-export interface WorkspaceProjectAnalysis {
-  name: string;
-  description?: string;
-  folder: string;
-  gitRepository?: string;
-  gitBranch?: string;
+export function resolveHomePath(inputPath: string): string {
+  if (inputPath.startsWith('~/')) {
+    return join(homedir(), inputPath.slice(2));
+  }
+  return inputPath;
 }

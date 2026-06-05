@@ -73,4 +73,5 @@ export enum NavigationPage {
   MODELS = 'models',
   PROJECTS = 'projects',
   PROJECT_DETAILS = 'project-details',
+  PROJECT_CREATE = 'project-create',
 }

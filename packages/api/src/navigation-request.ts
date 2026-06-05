@@ -97,6 +97,7 @@ export interface NavigationParameters {
   [NavigationPage.PROJECT_DETAILS]: {
     id: string;
   };
+  [NavigationPage.PROJECT_CREATE]: never;
 }
 
 // the parameters property is optional when the NavigationParameters say it is
