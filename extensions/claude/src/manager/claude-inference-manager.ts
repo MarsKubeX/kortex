@@ -27,9 +27,12 @@ import { ClaudeProviderSymbol, SecretStorageSymbol } from '/@/inject/symbol';
 
 export const TOKENS_KEY = 'claude:tokens';
 
+const DEFAULT_BASE_URL = 'https://api.anthropic.com';
+
 export interface StoredConnection {
   id: string;
   token: string;
+  baseURL?: string;
 }
 
 @injectable()
@@ -53,7 +56,11 @@ export class ClaudeInferenceManager {
   private async restoreConnections(): Promise<void> {
     const stored = await this.getStoredConnections();
     for (const entry of stored) {
-      await this.registerInferenceProviderConnection({ id: entry.id, token: entry.token });
+      await this.registerInferenceProviderConnection({
+        id: entry.id,
+        token: entry.token,
+        baseURL: entry.baseURL ?? DEFAULT_BASE_URL,
+      });
     }
   }
 
@@ -89,9 +96,20 @@ export class ClaudeInferenceManager {
     await this.secrets.store(TOKENS_KEY, JSON.stringify(filtered));
   }
 
-  private async registerInferenceProviderConnection({ id, token }: { id: string; token: string }): Promise<void> {
+  private async registerInferenceProviderConnection({
+    id,
+    token,
+    baseURL,
+  }: {
+    id: string;
+    token: string;
+    baseURL: string;
+  }): Promise<void> {
+    const isCustomBaseURL = baseURL !== DEFAULT_BASE_URL;
+
     const anthropic = createAnthropic({
       apiKey: token,
+      ...(isCustomBaseURL && { baseURL }),
     });
 
     const clean = async (): Promise<void> => {
@@ -104,18 +122,21 @@ export class ClaudeInferenceManager {
     let models: InferenceModel[] = [];
 
     try {
-      models = await this.getAnthropicModels(token);
+      models = await this.getAnthropicModels(token, baseURL);
     } catch (err: unknown) {
       status = 'stopped';
     }
 
+    const connectionName = isCustomBaseURL ? baseURL : this.maskKey(token);
+
     const connectionDisposable = this.claudeProvider.registerInferenceProviderConnection({
       id,
-      name: this.maskKey(token),
-      type: 'cloud',
+      name: connectionName,
+      type: isCustomBaseURL ? 'self-hosted' : 'cloud',
       llmMetadata: {
         name: 'anthropic',
       },
+      ...(isCustomBaseURL && { endpoint: baseURL }),
       sdk: anthropic,
       status(): ProviderConnectionStatus {
         return status;
@@ -133,8 +154,12 @@ export class ClaudeInferenceManager {
     this.connections.set(id, connectionDisposable);
   }
 
-  private async getAnthropicModels(token: string): Promise<Array<{ label: string }>> {
-    const client = new AnthropicClient({ apiKey: token });
+  private async getAnthropicModels(token: string, baseURL: string): Promise<Array<{ label: string }>> {
+    const isCustomBaseURL = baseURL !== DEFAULT_BASE_URL;
+    const client = new AnthropicClient({
+      apiKey: token,
+      ...(isCustomBaseURL && { baseURL }),
+    });
     const models: InferenceModel[] = [];
     for await (const model of client.models.list()) {
       if (model.id) {
@@ -153,9 +178,13 @@ export class ClaudeInferenceManager {
     const apiKey = params['claude.factory.apiKey'];
     if (!apiKey || typeof apiKey !== 'string') throw new Error('invalid apiKey');
 
+    const rawBaseURL = params['claude.factory.baseURL'];
+    const baseURL = typeof rawBaseURL === 'string' && rawBaseURL.trim() ? rawBaseURL.trim() : DEFAULT_BASE_URL;
+
     const id = randomUUID();
-    await this.saveConnection({ id, token: apiKey });
-    await this.registerInferenceProviderConnection({ id, token: apiKey });
+    const isCustomBaseURL = baseURL !== DEFAULT_BASE_URL;
+    await this.saveConnection({ id, token: apiKey, ...(isCustomBaseURL && { baseURL }) });
+    await this.registerInferenceProviderConnection({ id, token: apiKey, baseURL });
   }
 
   dispose(): void {
