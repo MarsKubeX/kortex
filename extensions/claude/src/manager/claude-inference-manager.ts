@@ -114,17 +114,17 @@ export class ClaudeInferenceManager {
     await this.secrets.store(secretName, token);
 
     const config = configuration.getConfiguration(undefined, connection);
-    await config.update('_type', PROVIDER_ID);
-    await config.update('token', secretName);
+    await config.update('claude.connection._type', PROVIDER_ID);
+    await config.update('claude.connection.token', secretName);
   }
 
   private async clearConnectionConfiguration(connection: InferenceProviderConnection): Promise<void> {
     const secretName = this.getSecretName(connection.id);
     await this.secrets.delete(secretName);
 
-    const config = configuration.getConfiguration('claude.connection', connection);
-    await config.update('_type', undefined);
-    await config.update('token', undefined);
+    const config = configuration.getConfiguration(undefined, connection);
+    await config.update('claude.connection._type', undefined);
+    await config.update('claude.connection.token', undefined);
   }
 
   private async registerInferenceProviderConnection({
