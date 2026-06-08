@@ -174,6 +174,28 @@ const config = {
     // download & bundle kdn CLI binary
     await downloadKdn(context);
 
+    // include pre-downloaded OpenShell binaries (not available on Windows)
+    const openshellArchMap = { [Arch.x64]: 'x64', [Arch.arm64]: 'arm64' };
+    const openshellArch = openshellArchMap[context.arch];
+    if (openshellArch && context.electronPlatformName !== 'win32') {
+      const openshellAssetsDir = path.join(
+        'extensions',
+        'openshell',
+        'assets',
+        `${context.electronPlatformName}-${openshellArch}`,
+      );
+      if (!fs.existsSync(openshellAssetsDir)) {
+        throw new Error(
+          `OpenShell assets not found at ${openshellAssetsDir}. Run "pnpm --filter openshell download" (or "pnpm --filter openshell download:all") before packaging.`,
+        );
+      }
+      context.packager.config.extraResources.push({
+        from: openshellAssetsDir,
+        to: 'openshell',
+        filter: ['!.openshell-version'],
+      });
+    }
+
     // include product.json
     context.packager.config.extraResources.push({
       from: 'product.json',

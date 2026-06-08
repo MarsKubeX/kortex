@@ -16,18 +16,19 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import type { CliToolInstallationSource, Disposable, ExtensionContext } from '@openkaiden/api';
 import * as extensionApi from '@openkaiden/api';
 import { inject, injectable } from 'inversify';
 
 import { ExtensionContextSymbol } from '/@/inject/symbol';
+import { OpenshellInstaller } from '/@/openshell-installer';
 
 interface BinaryDiscoveryResult {
-  path: string;
-  version: string;
+  path?: string;
+  version?: string;
   installationSource: CliToolInstallationSource;
 }
 
@@ -43,26 +44,29 @@ export class OpenshellCliManager implements Disposable {
   }
 
   async init(): Promise<void> {
+    const packageJsonPath = join(this.extensionContext.extensionUri.fsPath, 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+
     const cliResult = await this.discoverBinary('openshell', 'openshell.binary.path');
-    if (!cliResult) {
-      console.warn('[openshell] CLI not found, skipping registration');
-      return;
-    }
+    const registration: BinaryDiscoveryResult = cliResult ?? {
+      installationSource: 'extension',
+    };
 
-    this.#registeredPath = cliResult.path;
-    this.registerCliTool('openshell', 'OpenShell', 'OpenShell CLI for managing sandboxed workspaces', cliResult);
-
-    const gatewayResult = await this.discoverGatewayBinary(cliResult.path);
-    if (gatewayResult) {
-      this.registerCliTool(
-        'openshell-gateway',
-        'OpenShell Gateway',
-        'OpenShell Gateway server for sandbox orchestration',
-        gatewayResult,
-      );
+    if (cliResult?.path) {
+      this.#registeredPath = cliResult.path;
     } else {
-      console.warn('[openshell-gateway] binary not found, skipping registration');
+      console.warn('[openshell] CLI not found, registering installer-only entry');
     }
+
+    const cliTool = this.registerCliTool(
+      'openshell',
+      'OpenShell',
+      'OpenShell CLI for managing sandboxed workspaces',
+      registration,
+    );
+    const installer = new OpenshellInstaller(cliTool, packageJson.openshellVersion, this.extensionContext.storagePath);
+
+    this.extensionContext.subscriptions.push(cliTool.registerInstaller(installer));
   }
 
   dispose(): void {}
@@ -72,7 +76,7 @@ export class OpenshellCliManager implements Disposable {
     displayName: string,
     markdownDescription: string,
     result: BinaryDiscoveryResult,
-  ): void {
+  ): extensionApi.CliTool {
     const cliTool = extensionApi.cli.createCliTool({
       name,
       displayName,
@@ -84,6 +88,7 @@ export class OpenshellCliManager implements Disposable {
     });
     this.extensionContext.subscriptions.push(cliTool);
     console.log(`[${name}] registered at ${result.path} (v${result.version})`);
+    return cliTool;
   }
 
   private async discoverBinary(binaryBaseName: string, configKey: string): Promise<BinaryDiscoveryResult | undefined> {
@@ -114,25 +119,6 @@ export class OpenshellCliManager implements Disposable {
     if (systemResult) {
       console.log(`[${binaryBaseName}] binary found in system PATH`);
       return { path: systemResult.path, version: systemResult.version, installationSource: 'external' };
-    }
-
-    return undefined;
-  }
-
-  private async discoverGatewayBinary(cliPath: string): Promise<BinaryDiscoveryResult | undefined> {
-    const result = await this.discoverBinary('openshell-gateway', 'openshell.gateway.binary.path');
-    if (result) {
-      return result;
-    }
-
-    const gatewayName = extensionApi.env.isWindows ? 'openshell-gateway.exe' : 'openshell-gateway';
-    const siblingPath = join(dirname(cliPath), gatewayName);
-    if (existsSync(siblingPath)) {
-      const version = await this.getVersion(siblingPath);
-      if (version) {
-        console.log('[openshell-gateway] binary found alongside openshell CLI');
-        return { path: siblingPath, version, installationSource: 'external' };
-      }
     }
 
     return undefined;
