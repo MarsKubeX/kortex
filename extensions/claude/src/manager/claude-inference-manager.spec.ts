@@ -130,6 +130,28 @@ describe('init', () => {
     );
   });
 
+  test('should restore connection with custom baseURL', async () => {
+    const stored: StoredConnection[] = [{ id: 'custom-id', token: 'key1', baseURL: 'http://localhost:8080' }];
+    vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(JSON.stringify(stored));
+
+    const manager = await createManager();
+    await manager.init();
+
+    expect(createAnthropic).toHaveBeenCalledWith({
+      apiKey: 'key1',
+      baseURL: 'http://localhost:8080',
+    });
+
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'custom-id',
+        name: 'http://localhost:8080',
+        type: 'self-hosted',
+        endpoint: 'http://localhost:8080',
+      }),
+    );
+  });
+
   test('should handle empty secret storage', async () => {
     vi.mocked(SECRET_STORAGE_MOCK.get).mockResolvedValue(undefined);
 
@@ -210,7 +232,7 @@ describe('factory', () => {
     expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(TOKENS_KEY, JSON.stringify(expected));
   });
 
-  test('calling create with proper params should register inference connection', async () => {
+  test('calling create with default baseURL should not pass baseURL to SDK', async () => {
     await create({
       'claude.factory.apiKey': 'dummyKey',
     });
@@ -239,6 +261,56 @@ describe('factory', () => {
       sdk: ANTHROPIC_PROVIDER_MOCK,
       models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-haiku-3.5-20241022' }],
       credentials: expect.any(Function),
+    });
+  });
+
+  test('calling create with custom baseURL should pass it to SDKs', async () => {
+    await create({
+      'claude.factory.apiKey': 'dummyKey',
+      'claude.factory.baseURL': 'http://localhost:8080',
+    });
+
+    expect(createAnthropic).toHaveBeenCalledOnce();
+    expect(createAnthropic).toHaveBeenCalledWith({
+      apiKey: 'dummyKey',
+      baseURL: 'http://localhost:8080',
+    });
+
+    expect(AnthropicClient).toHaveBeenCalledWith({
+      apiKey: 'dummyKey',
+      baseURL: 'http://localhost:8080',
+    });
+
+    const expected: StoredConnection[] = [{ id: 'fake-uuid-1', token: 'dummyKey', baseURL: 'http://localhost:8080' }];
+    expect(SECRET_STORAGE_MOCK.store).toHaveBeenCalledWith(TOKENS_KEY, JSON.stringify(expected));
+
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledOnce();
+    expect(PROVIDER_MOCK.registerInferenceProviderConnection).toHaveBeenCalledWith({
+      id: 'fake-uuid-1',
+      name: 'http://localhost:8080',
+      type: 'self-hosted',
+      llmMetadata: {
+        name: 'anthropic',
+      },
+      endpoint: 'http://localhost:8080',
+      status: expect.any(Function),
+      lifecycle: {
+        delete: expect.any(Function),
+      },
+      sdk: ANTHROPIC_PROVIDER_MOCK,
+      models: [{ label: 'claude-sonnet-4-20250514' }, { label: 'claude-haiku-3.5-20241022' }],
+      credentials: expect.any(Function),
+    });
+  });
+
+  test('calling create with empty baseURL should use default', async () => {
+    await create({
+      'claude.factory.apiKey': 'dummyKey',
+      'claude.factory.baseURL': '  ',
+    });
+
+    expect(createAnthropic).toHaveBeenCalledWith({
+      apiKey: 'dummyKey',
     });
   });
 });
