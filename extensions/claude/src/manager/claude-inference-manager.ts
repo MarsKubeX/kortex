@@ -20,9 +20,18 @@ import { randomUUID } from 'node:crypto';
 
 import { createAnthropic } from '@ai-sdk/anthropic';
 import AnthropicClient from '@anthropic-ai/sdk';
-import type { Disposable, InferenceModel, Provider, ProviderConnectionStatus, SecretStorage } from '@openkaiden/api';
+import type {
+  Disposable,
+  InferenceModel,
+  InferenceProviderConnection,
+  Provider,
+  ProviderConnectionStatus,
+  SecretStorage,
+} from '@openkaiden/api';
+import { configuration } from '@openkaiden/api';
 import { inject, injectable } from 'inversify';
 
+import { PROVIDER_ID } from '/@/claude-extension';
 import { ClaudeProviderSymbol, SecretStorageSymbol } from '/@/inject/symbol';
 
 export const TOKENS_KEY = 'claude:tokens';
@@ -96,6 +105,28 @@ export class ClaudeInferenceManager {
     await this.secrets.store(TOKENS_KEY, JSON.stringify(filtered));
   }
 
+  private getSecretName(connectionId: string): string {
+    return `${PROVIDER_ID}:${connectionId}:token`;
+  }
+
+  private async setConnectionConfiguration(connection: InferenceProviderConnection, token: string): Promise<void> {
+    const secretName = this.getSecretName(connection.id);
+    await this.secrets.store(secretName, token);
+
+    const config = configuration.getConfiguration(undefined, connection);
+    await config.update('_type', PROVIDER_ID);
+    await config.update('token', secretName);
+  }
+
+  private async clearConnectionConfiguration(connection: InferenceProviderConnection): Promise<void> {
+    const secretName = this.getSecretName(connection.id);
+    await this.secrets.delete(secretName);
+
+    const config = configuration.getConfiguration('claude.connection', connection);
+    await config.update('_type', undefined);
+    await config.update('token', undefined);
+  }
+
   private async registerInferenceProviderConnection({
     id,
     token,
@@ -105,18 +136,16 @@ export class ClaudeInferenceManager {
     token: string;
     baseURL: string;
   }): Promise<void> {
+    if (this.connections.has(id)) {
+      throw new Error(`connection already exists for id ${id}`);
+    }
+
     const isCustomBaseURL = baseURL !== DEFAULT_BASE_URL;
 
     const anthropic = createAnthropic({
       apiKey: token,
       ...(isCustomBaseURL && { baseURL }),
     });
-
-    const clean = async (): Promise<void> => {
-      this.connections.get(id)?.dispose();
-      this.connections.delete(id);
-      await this.removeConnection(id);
-    };
 
     let status: ProviderConnectionStatus = 'unknown';
     let models: InferenceModel[] = [];
@@ -129,7 +158,7 @@ export class ClaudeInferenceManager {
 
     const connectionName = isCustomBaseURL ? baseURL : this.maskKey(token);
 
-    const connectionDisposable = this.claudeProvider.registerInferenceProviderConnection({
+    const connection: InferenceProviderConnection = {
       id,
       name: connectionName,
       type: isCustomBaseURL ? 'self-hosted' : 'cloud',
@@ -142,7 +171,12 @@ export class ClaudeInferenceManager {
         return status;
       },
       lifecycle: {
-        delete: clean.bind(this),
+        delete: async (): Promise<void> => {
+          await this.clearConnectionConfiguration(connection);
+          this.connections.get(id)?.dispose();
+          this.connections.delete(id);
+          await this.removeConnection(id);
+        },
       },
       models,
       credentials(): Record<string, string> {
@@ -150,8 +184,12 @@ export class ClaudeInferenceManager {
           [TOKENS_KEY]: token,
         };
       },
-    });
+    };
+
+    const connectionDisposable = this.claudeProvider.registerInferenceProviderConnection(connection);
     this.connections.set(id, connectionDisposable);
+
+    await this.setConnectionConfiguration(connection, token);
   }
 
   private async getAnthropicModels(token: string, baseURL: string): Promise<Array<{ label: string }>> {
