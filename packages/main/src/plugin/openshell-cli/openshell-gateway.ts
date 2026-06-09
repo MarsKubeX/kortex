@@ -36,9 +36,10 @@ const STOP_TIMEOUT_MS = 5000;
 /**
  * Manages the `openshell-gateway` server binary lifecycle.
  *
- * On {@link init}, discovers existing gateways via the CLI. If none are found,
- * auto-starts a local gateway by spawning the `openshell-gateway` binary,
- * waiting for it to become healthy, and registering it with the CLI.
+ * On {@link init}, discovers existing gateways via the CLI. If a healthy
+ * gateway is found it is selected. Otherwise, auto-starts a new local
+ * gateway by spawning the `openshell-gateway` binary, waiting for it to
+ * become healthy, and registering it with the CLI.
  */
 @injectable()
 export class OpenshellGateway implements Disposable {
@@ -58,9 +59,18 @@ export class OpenshellGateway implements Disposable {
   async init(): Promise<void> {
     try {
       const gateways = await this.openshellCli.listGateways();
-      if (gateways.length > 0) {
-        console.log(`[openshell-gateway] discovered ${gateways.length} existing gateway(s)`);
-        return;
+      const localGateways = gateways.filter(gw => gw.type === 'local' || this.isLocalEndpoint(gw.endpoint));
+      if (localGateways.length > 0) {
+        for (const gw of localGateways) {
+          if (await this.isEndpointHealthy(gw.endpoint)) {
+            if (!gw.active) {
+              await this.openshellCli.selectGateway(gw.name);
+            }
+            console.log(`[openshell-gateway] gateway '${gw.name}' is healthy and selected`);
+            return;
+          }
+        }
+        console.warn('[openshell-gateway] local gateway(s) defined but none reachable');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -83,12 +93,25 @@ export class OpenshellGateway implements Disposable {
     await this.start();
   }
 
-  private async isEndpointHealthy(): Promise<boolean> {
-    const endpoint = `http://${this.#bindAddress}:${this.#port}`;
+  private async isEndpointHealthy(endpoint?: string): Promise<boolean> {
+    const target = endpoint ?? `http://${this.#bindAddress}:${this.#port}`;
     const cliPath = this.getCliPath();
+    const args = ['status', '--gateway-endpoint', target];
+    if (target.startsWith('http://')) {
+      args.push('--gateway-insecure');
+    }
     try {
-      await this.exec.exec(cliPath, ['status', '--gateway-endpoint', endpoint, '--gateway-insecure']);
+      await this.exec.exec(cliPath, args);
       return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private isLocalEndpoint(endpoint: string): boolean {
+    try {
+      const url = new URL(endpoint);
+      return ['127.0.0.1', 'localhost', '::1'].includes(url.hostname);
     } catch {
       return false;
     }
@@ -114,6 +137,9 @@ export class OpenshellGateway implements Disposable {
     if (!binaryPath) {
       throw new Error('openshell-gateway binary not registered in CLI tool registry');
     }
+
+    const previousPort = this.#port;
+    const previousBindAddress = this.#bindAddress;
 
     if (options?.port !== undefined) {
       this.#port = options.port;
@@ -148,8 +174,19 @@ export class OpenshellGateway implements Disposable {
       this.#gatewayProcess = undefined;
     });
 
-    await this.waitForReady();
-    await this.registerWithCli();
+    try {
+      await this.waitForReady();
+    } catch (err: unknown) {
+      await this.stop().catch((stopErr: unknown) => {
+        console.warn('[openshell-gateway] failed to stop after startup error:', stopErr);
+      });
+      this.#port = previousPort;
+      this.#bindAddress = previousBindAddress;
+      throw err;
+    }
+    if (!options?.skipRegistration) {
+      await this.registerWithCli();
+    }
   }
 
   async stop(): Promise<void> {
@@ -163,7 +200,7 @@ export class OpenshellGateway implements Disposable {
 
     await new Promise<void>(resolve => {
       const timeout = setTimeout(() => {
-        if (proc.exitCode === undefined || proc.exitCode === null) {
+        if (typeof proc.exitCode !== 'number') {
           console.warn('[openshell-gateway] did not exit after SIGTERM, sending SIGKILL');
           proc.kill('SIGKILL');
         }
@@ -180,7 +217,7 @@ export class OpenshellGateway implements Disposable {
   }
 
   isRunning(): boolean {
-    return this.#gatewayProcess !== undefined && this.#gatewayProcess.exitCode === undefined;
+    return this.#gatewayProcess !== undefined && typeof this.#gatewayProcess.exitCode !== 'number';
   }
 
   @preDestroy()
