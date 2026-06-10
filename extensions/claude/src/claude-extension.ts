@@ -24,6 +24,8 @@ import { InversifyBinding } from '/@/inject/inversify-binding';
 import { ClaudeInferenceManager } from '/@/manager/claude-inference-manager';
 import { ClaudeSkillsManager } from '/@/manager/claude-skills-manager';
 
+export const PROVIDER_ID = 'claude';
+
 export class ClaudeExtension {
   #extensionContext: ExtensionContext;
 
@@ -49,7 +51,7 @@ export class ClaudeExtension {
     const claudeProvider = provider.createProvider({
       name: 'Claude',
       status: 'unknown',
-      id: 'claude',
+      id: PROVIDER_ID,
       images: providerImages,
     });
 
