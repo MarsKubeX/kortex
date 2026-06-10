@@ -75,6 +75,7 @@ import { OpenshellGateway } from '/@/plugin/openshell-cli/openshell-gateway.js';
 import { OpenshellImageBuilder } from '/@/plugin/openshell-cli/openshell-image-builder.js';
 import { RagEnvironmentRegistry } from '/@/plugin/rag-environment-registry.js';
 import { SchedulerRegistry } from '/@/plugin/scheduler/scheduler-registry.js';
+import { OpenshellSecretAdapter } from '/@/plugin/secret-manager/openshell-secret-adapter.js';
 import { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
 import { SemanticRouterManager } from '/@/plugin/semantic-router/semantic-router-manager.js';
 import { SkillManager } from '/@/plugin/skill/skill-manager.js';
@@ -596,6 +597,7 @@ export class PluginSystem {
     container.bind<OpenshellGateway>(OpenshellGateway).toSelf().inSingletonScope();
     container.bind<OpenshellImageBuilder>(OpenshellImageBuilder).toSelf().inSingletonScope();
     container.bind<AgentWorkspaceManager>(AgentWorkspaceManager).toSelf().inSingletonScope();
+    container.bind<OpenshellSecretAdapter>(OpenshellSecretAdapter).toSelf().inSingletonScope();
     container.bind<SecretManager>(SecretManager).toSelf().inSingletonScope();
     container.bind<FlowManager>(FlowManager).toSelf().inSingletonScope();
     container.bind<SkillManager>(SkillManager).toSelf().inSingletonScope();
