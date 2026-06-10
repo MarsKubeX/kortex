@@ -35,8 +35,8 @@ importers:
   .:
     dependencies:
       '@agentclientprotocol/sdk':
-        specifier: ^0.24.0
-        version: 0.24.0(zod@4.3.6)
+        specifier: ^0.25.0
+        version: 0.25.0(zod@4.3.6)
       '@ai-sdk/mcp':
         specifier: ^1.0.46
         version: 1.0.46(zod@4.3.6)
@@ -1101,8 +1101,8 @@ packages:
   '@adobe/css-tools@4.4.3':
     resolution: {integrity: sha512-VQKMkwriZbaOgVCby1UDY/LDk5fIjhQicCvVPFqfe+69fWaPWydbWJ3wRt59/YzIwda1I81loas3oCoHxnqvdA==}
 
-  '@agentclientprotocol/sdk@0.24.0':
-    resolution: {integrity: sha512-vvu9appvGvfYstBj19C6NCepV6SvUhY5VRv60KUZ4XzhTah/olOYul5Zo4C+x2enyshMSvgB2mm/OEmrsHaSmA==}
+  '@agentclientprotocol/sdk@0.25.0':
+    resolution: {integrity: sha512-wU1VgXNtMvdVotX49txc3WJUDV+/QbLpsgjMvFhlRmp37osdLbI7L7y+iwAlQATwfjLxcv1r1p3ZxZBcXlGhcQ==}
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
@@ -8082,7 +8082,7 @@ snapshots:
 
   '@adobe/css-tools@4.4.3': {}
 
-  '@agentclientprotocol/sdk@0.24.0(zod@4.3.6)':
+  '@agentclientprotocol/sdk@0.25.0(zod@4.3.6)':
     dependencies:
       zod: 4.3.6
 
