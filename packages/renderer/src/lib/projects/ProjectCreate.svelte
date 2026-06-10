@@ -6,19 +6,22 @@ import type { ChecklistItem } from '/@/lib/ui/ChecklistPanel.svelte';
 import FormPage from '/@/lib/ui/FormPage.svelte';
 import WizardStepper from '/@/lib/ui/WizardStepper.svelte';
 import { handleNavigation } from '/@/navigation';
+import { mcpRemoteServerInfos } from '/@/stores/mcp-remote-servers';
 import { skillInfos } from '/@/stores/skills';
 import { NavigationPage } from '/@api/navigation-page';
 import type { WorkspaceProjectAnalysis } from '/@api/workspace-project-info';
 
 import { extractRepoName, extractRepoSlug, formatGitUrl } from './git-url-utils';
+import ProjectCreateStepMcpServers, { type McpServerItem } from './ProjectCreateStepMcpServers.svelte';
 import ProjectCreateStepReview from './ProjectCreateStepReview.svelte';
 import ProjectCreateStepSkills from './ProjectCreateStepSkills.svelte';
 import ProjectCreateStepSource from './ProjectCreateStepSource.svelte';
 
 const wizardSteps = [
   { id: 'source', title: 'Source' },
-  { id: 'skills', title: 'Skills' },
   { id: 'review', title: 'Review' },
+  { id: 'mcp-servers', title: 'MCP Servers' },
+  { id: 'skills', title: 'Skills' },
 ];
 
 let currentStepIndex = $state(0);
@@ -49,6 +52,24 @@ let skillItems: ChecklistItem[] = $derived(
     })),
 );
 
+const RECOMMENDED_SERVER_KEYWORDS = ['github', 'fetch'];
+
+function isRecommendedServer(name: string): boolean {
+  const lower = name.toLowerCase();
+  return RECOMMENDED_SERVER_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+let mcpItems: McpServerItem[] = $derived(
+  $mcpRemoteServerInfos.map(m => ({
+    id: m.id,
+    name: m.name,
+    description: m.description,
+    recommended: isRecommendedServer(m.name),
+  })),
+);
+let selectedMcpIds: string[] = $state([]);
+let hasInitializedMcpSelection = $state(false);
+
 let isGitSource = $derived(gitUrl.trim() !== '' && sourcePath.trim() === '');
 let gitRepoDisplay = $derived(formatGitUrl(gitUrl));
 
@@ -64,11 +85,18 @@ function goBack(): void {
   if (currentStepIndex > 0) currentStepIndex--;
 }
 
+function preselectRecommendedMcpServers(): void {
+  if (hasInitializedMcpSelection || mcpItems.length === 0) return;
+  selectedMcpIds = mcpItems.filter(m => m.recommended).map(m => m.id);
+  hasInitializedMcpSelection = true;
+}
+
 function handleStepClick(index: number): void {
   if (index > currentStepIndex && !isGitSource && !analysis) {
     return;
   }
   currentStepIndex = index;
+  if (wizardSteps[index]?.id === 'mcp-servers') preselectRecommendedMcpServers();
 }
 
 async function handleBrowseSource(): Promise<void> {
@@ -162,7 +190,7 @@ async function createProject(): Promise<void> {
       description: projectDescription.trim() || undefined,
       folder,
       skills: [...selectedSkillIds],
-      mcpServers: [],
+      mcpServers: [...selectedMcpIds],
       knowledges: [],
       secrets: [],
       filesystem: { mode: 'project', mounts: [] },
@@ -220,6 +248,11 @@ async function createProject(): Promise<void> {
                 onBrowseCloneTo={handleBrowseCloneTo}
                 {error}
               />
+            {:else if currentStepId === 'mcp-servers'}
+              <ProjectCreateStepMcpServers
+                {mcpItems}
+                bind:selectedMcpIds={selectedMcpIds}
+              />
             {/if}
           </div>
 
@@ -246,7 +279,7 @@ async function createProject(): Promise<void> {
                   {/if}
                 </Button>
               {:else}
-                <Button onclick={(): void => { currentStepIndex++; }}>Continue</Button>
+                <Button onclick={(): void => { currentStepIndex++; if (wizardSteps[currentStepIndex]?.id === 'mcp-servers') preselectRecommendedMcpServers(); }}>Continue</Button>
               {/if}
             </div>
           </div>
