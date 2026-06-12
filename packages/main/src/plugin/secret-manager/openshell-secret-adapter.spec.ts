@@ -39,7 +39,11 @@ describe('createSecret', () => {
   const defaultOptions: SecretCreateOptions = {
     name: 'my-secret',
     type: 'github',
-    value: 'ghp_abc123',
+    value: {
+      credentials: {
+        GH_TOKEN: 'ghp_abc123',
+      },
+    },
   };
 
   test('delegates to openshellCli.createProvider and returns the secret name', async () => {
@@ -50,7 +54,7 @@ describe('createSecret', () => {
     expect(openshellCli.createProvider).toHaveBeenCalledWith({
       name: 'my-secret',
       type: 'github',
-      credentials: { value: 'ghp_abc123' },
+      credentials: { GH_TOKEN: 'ghp_abc123' },
     });
     expect(result).toEqual({ name: 'my-secret' });
   });

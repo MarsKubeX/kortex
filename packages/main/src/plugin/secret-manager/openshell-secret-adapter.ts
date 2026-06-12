@@ -46,10 +46,13 @@ export class OpenshellSecretAdapter implements SecretCliBackend {
   ) {}
 
   async createSecret(options: SecretCreateOptions): Promise<SecretName> {
+    if (typeof options.value === 'string') {
+      throw new Error('options.value must be a record for Openshell');
+    }
     await this.openshellCli.createProvider({
       name: options.name,
       type: options.type,
-      credentials: { value: options.value },
+      credentials: options.value.credentials,
     });
     return { name: options.name };
   }

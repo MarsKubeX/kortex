@@ -52,6 +52,7 @@ export interface CreateSandboxOptions {
   labels?: Record<string, string>;
   uploads?: Array<{ local: string; remote: string }>;
   command?: string[];
+  noTty?: boolean;
 }
 
 export interface GatewayAddOptions {

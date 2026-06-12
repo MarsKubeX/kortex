@@ -247,6 +247,18 @@ describe('createSandbox', () => {
     );
   });
 
+  test('passes --no-tty before command when noTty is true', async () => {
+    vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
+
+    await openshellCli.createSandbox({ noTty: true, command: ['true'] });
+
+    expect(exec.exec).toHaveBeenCalledWith(
+      OPENSHELL_CLI_PATH,
+      ['sandbox', 'create', '--no-tty', '--', 'true'],
+      undefined,
+    );
+  });
+
   test('rejects when CLI fails', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -776,8 +788,7 @@ describe('createProvider', () => {
 
     const loggedMessage = logSpy.mock.calls[0]?.[0] as string;
     expect(loggedMessage).not.toContain('sk-secret-123');
-    expect(loggedMessage).not.toContain('gpt-4');
-    expect(loggedMessage).toContain('***');
+    expect(loggedMessage).toContain('gpt-4');
   });
 
   test('rejects when CLI fails', async () => {

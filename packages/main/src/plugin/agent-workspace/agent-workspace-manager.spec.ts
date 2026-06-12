@@ -23,13 +23,14 @@ import type { FileSystemWatcher, InferenceProviderConnection } from '@openkaiden
 import type { WebContents } from 'electron';
 import type { IPty } from 'node-pty';
 import { spawn } from 'node-pty';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { IPCHandle } from '/@/plugin/api.js';
 import type { CliToolRegistry } from '/@/plugin/cli-tool-registry.js';
 import type { FilesystemMonitoring } from '/@/plugin/filesystem-monitoring.js';
 import { KdnCli } from '/@/plugin/kdn-cli/kdn-cli.js';
 import { OpenshellCli } from '/@/plugin/openshell-cli/openshell-cli.js';
+import { OpenshellImageBuilder } from '/@/plugin/openshell-cli/openshell-image-builder.js';
 import type { ProviderRegistry } from '/@/plugin/provider-registry.js';
 import type { SafeStorageRegistry, SecretStorageWrapper } from '/@/plugin/safe-storage/safe-storage-registry.js';
 import type { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
@@ -49,6 +50,7 @@ vi.mock(import('node-pty'));
 
 vi.mock(import('/@/plugin/kdn-cli/kdn-cli.js'));
 vi.mock(import('/@/plugin/openshell-cli/openshell-cli.js'));
+vi.mock(import('/@/plugin/openshell-cli/openshell-image-builder.js'));
 
 const TEST_SUMMARIES: AgentWorkspaceSummary[] = [
   {
@@ -85,6 +87,7 @@ const apiSender: ApiSenderType = {
 const ipcHandle: IPCHandle = vi.fn();
 const kdnCli = new KdnCli({} as Exec, {} as CliToolRegistry);
 const openshellCli = new OpenshellCli({} as Exec, {} as CliToolRegistry);
+const imageBuilderCli = new OpenshellImageBuilder({} as Exec, {} as CliToolRegistry);
 
 const mockTask = {
   id: 'task-1',
@@ -170,6 +173,7 @@ beforeEach(() => {
     secretManager,
     openshellCli,
     safeStorageRegistry,
+    imageBuilderCli,
   );
   manager.init();
 });
@@ -355,6 +359,107 @@ describe('create', () => {
 
     expect(rm).not.toHaveBeenCalled();
     expect(kdnCli.createWorkspace).toHaveBeenCalled();
+  });
+});
+
+describe('create – OpenShell mode', () => {
+  const defaultOptions: AgentWorkspaceCreateOptions = {
+    sourcePath: '/tmp/my-project',
+    agent: 'claude',
+    runtime: 'podman',
+    name: 'my-sandbox',
+  };
+
+  beforeEach(() => {
+    process.env['KAIDEN_OPENSHELL'] = '1';
+    vi.mocked(kdnCli.writeWorkspaceConfig).mockResolvedValue(undefined);
+    vi.mocked(imageBuilderCli.buildImage).mockResolvedValue(undefined);
+    vi.mocked(openshellCli.createSandbox).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    delete process.env['KAIDEN_OPENSHELL'];
+  });
+
+  test('calls imageBuilderCli.buildImage with correct tag and agent option', async () => {
+    await manager.create(defaultOptions);
+
+    expect(imageBuilderCli.buildImage).toHaveBeenCalledWith(
+      'kaiden-workspace-my-sandbox:latest',
+      expect.objectContaining({ agent: 'claude', cwd: '/tmp/my-project' }),
+    );
+  });
+
+  test('calls openshellCli.createSandbox with from, name, providers, and workspace label', async () => {
+    const options = { ...defaultOptions, secrets: ['my-secret'] };
+    await manager.create(options);
+
+    expect(openshellCli.createSandbox).toHaveBeenCalledWith({
+      name: 'my-sandbox',
+      from: 'kaiden-workspace-my-sandbox:latest',
+      providers: ['my-secret'],
+      labels: { 'ai.openkaiden.kaiden.workspace': Buffer.from('/tmp/my-project').toString('base64url') },
+      noTty: true,
+      command: ['true'],
+    });
+  });
+
+  test('returns { id: sandboxName }', async () => {
+    const result = await manager.create(defaultOptions);
+
+    expect(result).toEqual({ id: 'my-sandbox' });
+  });
+
+  test('does not call kdnCli.createWorkspace', async () => {
+    await manager.create(defaultOptions);
+
+    expect(kdnCli.createWorkspace).not.toHaveBeenCalled();
+  });
+
+  test('derives sandbox name from sourcePath basename when name is omitted', async () => {
+    const options: AgentWorkspaceCreateOptions = { sourcePath: '/tmp/my-project', agent: 'claude' };
+    const result = await manager.create(options);
+
+    expect(openshellCli.createSandbox).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-project' }));
+    expect(result).toEqual({ id: 'my-project' });
+  });
+
+  test('sanitizes uppercase and special characters in sandbox name for image tag', async () => {
+    const options = { ...defaultOptions, name: 'My Project/V2!' };
+    await manager.create(options);
+
+    expect(imageBuilderCli.buildImage).toHaveBeenCalledWith(
+      'kaiden-workspace-my-project-v2:latest',
+      expect.any(Object),
+    );
+  });
+
+  test('passes model name, inference, and endpoint to buildImage', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: { 'claude:tokens': 'sk-ant-secret' },
+      llmMetadataName: 'anthropic',
+      endpoint: 'https://api.anthropic.com',
+    });
+    vi.mocked(secretManager.create).mockResolvedValue({ name: 'my-sandbox-anthropic' });
+
+    const options = { ...defaultOptions, model: 'anthropic::claude-3-5-sonnet::' };
+    await manager.create(options);
+
+    expect(imageBuilderCli.buildImage).toHaveBeenCalledWith(
+      'kaiden-workspace-my-sandbox:latest',
+      expect.objectContaining({
+        model: 'claude-3-5-sonnet',
+        inference: 'anthropic',
+        endpoint: 'https://api.anthropic.com',
+      }),
+    );
+  });
+
+  test('falls back to "workspace" image tag component when name sanitizes to empty', async () => {
+    const options = { ...defaultOptions, name: '!!!' };
+    await manager.create(options);
+
+    expect(imageBuilderCli.buildImage).toHaveBeenCalledWith('kaiden-workspace-workspace:latest', expect.any(Object));
   });
 });
 
@@ -781,11 +886,15 @@ describe('ensureModelSecret', () => {
     expect(safeStorageRegistry.getExtensionStorage).toHaveBeenCalledWith('kaiden.cursor');
     expect(extensionStorageMock.get).toHaveBeenCalledWith('cursor:conn-1:token');
     expect(secretManager.create).toHaveBeenCalledWith({
-      name: 'my-workspace-cursor-token',
+      name: 'my-workspace-cursor',
       type: 'cursor',
-      value: 'actual-api-key',
+      value: {
+        credentials: {
+          token: 'actual-api-key',
+        },
+      },
     });
-    expect(options.secrets).toContain('my-workspace-cursor-token');
+    expect(options.secrets).toContain('my-workspace-cursor');
     expect(providerRegistry.getInferenceConnectionCredentials).not.toHaveBeenCalled();
   });
 
@@ -917,7 +1026,7 @@ describe('ensureModelSecret', () => {
     };
     await manager.ensureModelSecret(options);
 
-    expect(secretManager.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-project-mistral-token' }));
+    expect(secretManager.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'my-project-mistral' }));
   });
 });
 

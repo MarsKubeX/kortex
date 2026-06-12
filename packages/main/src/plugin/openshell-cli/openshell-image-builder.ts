@@ -27,6 +27,8 @@ export interface BuildImageOptions {
   endpoint?: string;
   model?: string;
   config?: string;
+  /** Working directory for the process. The tool reads `.kaiden/workspace.json` from here. */
+  cwd?: string;
 }
 
 /**
@@ -96,7 +98,7 @@ export class OpenshellImageBuilder {
     const cliPath = this.getCliPath();
     console.log(`Executing: ${cliPath} ${args.join(' ')}`);
     try {
-      await this.exec.exec(cliPath, args);
+      await this.exec.exec(cliPath, args, { cwd: options.cwd });
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : String(err);
       console.error(`openshell-image-builder failed: ${cliPath} ${args.join(' ')} — ${detail}`);

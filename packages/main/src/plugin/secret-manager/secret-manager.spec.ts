@@ -206,7 +206,11 @@ describe('KAIDEN_OPENSHELL backend switching', () => {
   const defaultOptions: SecretCreateOptions = {
     name: 'my-secret',
     type: 'github',
-    value: 'ghp_abc123',
+    value: {
+      credentials: {
+        GH_TOKEN: 'ghp_abc123',
+      },
+    },
   };
 
   beforeEach(() => {
@@ -225,7 +229,7 @@ describe('KAIDEN_OPENSHELL backend switching', () => {
     expect(openshellCli.createProvider).toHaveBeenCalledWith({
       name: 'my-secret',
       type: 'github',
-      credentials: { value: 'ghp_abc123' },
+      credentials: { GH_TOKEN: 'ghp_abc123' },
     });
     expect(kdnCli.createSecret).not.toHaveBeenCalled();
     expect(result).toEqual({ name: 'my-secret' });

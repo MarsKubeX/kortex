@@ -33,8 +33,13 @@ export type SecretService = components['schemas']['SecretService'];
 /**
  * Options for creating a new secret via `kdn secret create`.
  */
+export interface SecretValue {
+  credentials: Record<string, string>;
+  config?: Record<string, string>;
+}
+
 export interface SecretCreateOptions extends SecretInfo {
-  value: string;
+  value: string | SecretValue;
 }
 
 /**

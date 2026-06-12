@@ -342,6 +342,9 @@ export class KdnCli implements SecretCliBackend {
 
   async createSecret(options: SecretCreateOptions): Promise<SecretName> {
     const cliPath = this.getCliPath();
+    if (typeof options.value !== 'string') {
+      throw new Error('options.value must be a string');
+    }
     const args = ['secret', 'create', options.name, '--type', options.type, '--value', options.value];
     if (options.description) {
       args.push('--description', options.description);
