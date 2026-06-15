@@ -100,6 +100,18 @@ describe('findModel', () => {
     expect(result).toBeUndefined();
   });
 
+  test('should match when connectionId is empty (old chat history wildcard)', () => {
+    const target: ModelInfo = {
+      providerId: 'ollama',
+      connectionId: '',
+      connectionName: 'local',
+      label: 'llama3',
+      type: 'local',
+    };
+    const result = findModel(models, target);
+    expect(result).toEqual(models[0]);
+  });
+
   test('should return undefined when type does not match', () => {
     const target: ModelInfo = {
       providerId: 'ollama',

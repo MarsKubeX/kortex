@@ -7,7 +7,7 @@ export function findModel(models: ModelInfo[], model: ModelInfo | undefined): Mo
     m =>
       m.label === model.label &&
       m.providerId === model.providerId &&
-      m.connectionId === model.connectionId &&
+      (model.connectionId === '' || m.connectionId === model.connectionId) &&
       m.type === model.type &&
       m.endpoint === model.endpoint,
   );
