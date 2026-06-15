@@ -37,7 +37,7 @@ const exportAsFlow = async (): Promise<void> => {
   loadingExportAsFlow = true;
 
   try {
-    const { providerId, connectionName, label } = selectedModel;
+    const { providerId, connectionId, connectionName, label } = selectedModel;
 
     const tools: Record<string, string[]> = Object.fromEntries(
       selectedMCPTools.entries().reduce(
@@ -53,6 +53,7 @@ const exportAsFlow = async (): Promise<void> => {
 
     const generatedFlowParams = await window.inferenceGenerateFlowParams({
       providerId,
+      connectionId,
       connectionName,
       modelId: label,
       tools: tools,

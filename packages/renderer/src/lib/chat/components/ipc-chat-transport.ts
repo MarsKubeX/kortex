@@ -30,11 +30,12 @@ export class IPCChatTransport<T extends UIMessage> implements ChatTransport<T> {
 
     return new ReadableStream<UIMessageChunk>({
       start(controller): void {
-        const { providerId, connectionName, label } = model;
+        const { providerId, connectionId, connectionName, label } = model;
         const onDataId = window.inferenceStreamText(
           {
             chatId: options.chatId,
             providerId,
+            connectionId,
             connectionName,
             modelId: label,
             tools,

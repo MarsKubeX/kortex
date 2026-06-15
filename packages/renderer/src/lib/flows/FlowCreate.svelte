@@ -77,6 +77,7 @@ async function handleDetectFields(): Promise<void> {
       chatId, // Optional - provides additional context if available
       prompt,
       providerId: selectedModel.providerId,
+      connectionId: selectedModel.connectionId,
       connectionName: selectedModel.connectionName,
       modelId: selectedModel.label,
     });

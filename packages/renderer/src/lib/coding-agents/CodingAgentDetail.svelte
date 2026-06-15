@@ -87,6 +87,7 @@ async function saveSelection(): Promise<void> {
     const agentSettings: DefaultPerAgentWorkspaceSettings = settings.defaultAgentSettings[agentInfo.id] ?? {};
     agentSettings.defaultModel = {
       providerId: selectedModel.providerId,
+      connectionId: selectedModel.connectionId,
       connectionName: selectedModel.connectionName,
       label: selectedModel.label,
     };

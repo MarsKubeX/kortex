@@ -88,11 +88,11 @@ describe('findModel', () => {
     expect(result).toBeUndefined();
   });
 
-  test('should return undefined when connectionName does not match', () => {
+  test('should return undefined when connectionId does not match', () => {
     const target: ModelInfo = {
       providerId: 'ollama',
-      connectionId: 'conn-0',
-      connectionName: 'wrong-connection',
+      connectionId: 'wrong-connection-id',
+      connectionName: 'local',
       label: 'llama3',
       type: 'local',
     };

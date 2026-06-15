@@ -7,7 +7,7 @@ export function findModel(models: ModelInfo[], model: ModelInfo | undefined): Mo
     m =>
       m.label === model.label &&
       m.providerId === model.providerId &&
-      m.connectionName === model.connectionName &&
+      m.connectionId === model.connectionId &&
       m.type === model.type &&
       m.endpoint === model.endpoint,
   );
@@ -62,7 +62,7 @@ const lastUsedModel = new LocalStorage<ModelInfo | undefined>(LAST_USED_MODEL_KE
 let selectedModel = $derived<ModelInfo | undefined>(
   config
     ? {
-        connectionId: '',
+        connectionId: config.connectionId ?? '',
         connectionName: config.connectionName,
         label: config.modelId,
         providerId: config.providerId,
