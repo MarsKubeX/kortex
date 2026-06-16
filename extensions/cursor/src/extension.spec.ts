@@ -16,12 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { Disposable, ExtensionContext } from '@openkaiden/api';
+import type { AgentConfigurationFile, AgentWorkspaceContext, Disposable, ExtensionContext } from '@openkaiden/api';
 import { agents } from '@openkaiden/api';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { CursorExtension } from './cursor-extension';
-import { activate } from './extension';
+import { activate, CURSOR_CLI_CONFIG_PATH } from './extension';
 
 vi.mock(import('@openkaiden/api'));
 vi.mock(import('./cursor-extension'));
@@ -79,5 +79,106 @@ describe('activate', () => {
     expect(agent.isSupportedModelType!({ name: 'cursor' })).toBe(true);
     expect(agent.isSupportedModelType!({ name: 'openai' })).toBe(false);
     expect(agent.isSupportedModelType!({ name: 'anthropic' })).toBe(false);
+  });
+
+  test('registers agent with cli-config.json configuration file', async () => {
+    await activate(extensionContextMock);
+
+    const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+    expect(agent.configurationFiles).toHaveLength(1);
+    expect(agent.configurationFiles[0]!.path).toBe(CURSOR_CLI_CONFIG_PATH);
+  });
+
+  describe('preWorkspaceStart', () => {
+    function createContext(configFiles: AgentConfigurationFile[], modelLabel = 'gpt-4o'): AgentWorkspaceContext {
+      return {
+        model: {
+          model: { label: modelLabel },
+        },
+        configurationFiles: configFiles,
+      };
+    }
+
+    test('writes model configuration into cli-config.json', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const configFile: AgentConfigurationFile = {
+        path: CURSOR_CLI_CONFIG_PATH,
+        read: vi.fn().mockResolvedValue('{}'),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile]));
+
+      expect(updateMock).toHaveBeenCalledOnce();
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written).toEqual({
+        model: {
+          modelId: 'gpt-4o',
+          displayModelId: 'gpt-4o',
+          displayName: 'gpt-4o',
+          displayNameShort: 'gpt-4o',
+          maxMode: false,
+        },
+        hasChangedDefaultModel: true,
+      });
+    });
+
+    test('preserves existing configuration fields', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const existingConfig = JSON.stringify({ customSetting: 'keep-me', version: 2 });
+      const configFile: AgentConfigurationFile = {
+        path: CURSOR_CLI_CONFIG_PATH,
+        read: vi.fn().mockResolvedValue(existingConfig),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile], 'claude-sonnet'));
+
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written.customSetting).toBe('keep-me');
+      expect(written.version).toBe(2);
+      expect(written.model.modelId).toBe('claude-sonnet');
+    });
+
+    test('handles invalid JSON by starting with empty config', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const configFile: AgentConfigurationFile = {
+        path: CURSOR_CLI_CONFIG_PATH,
+        read: vi.fn().mockResolvedValue('not valid json'),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile]));
+
+      expect(updateMock).toHaveBeenCalledOnce();
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written.model.modelId).toBe('gpt-4o');
+      expect(written.hasChangedDefaultModel).toBe(true);
+    });
+
+    test('does nothing when config file is not in context', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const otherFile: AgentConfigurationFile = {
+        path: 'some/other/path.json',
+        read: vi.fn(),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([otherFile]));
+
+      expect(updateMock).not.toHaveBeenCalled();
+    });
   });
 });

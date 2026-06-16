@@ -16,10 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ExtensionContext } from '@openkaiden/api';
+import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents } from '@openkaiden/api';
 
 import { CursorExtension } from './cursor-extension';
+
+export const CURSOR_CLI_CONFIG_PATH = '.cursor/cli-config.json';
 
 let cursorExtension: CursorExtension | undefined;
 
@@ -37,13 +39,44 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
     },
     command: 'cursor',
     tags: ['Local'],
-    configurationFiles: [],
+    configurationFiles: [
+      {
+        path: CURSOR_CLI_CONFIG_PATH,
+        async read(): Promise<string> {
+          return '{}';
+        },
+        async update(): Promise<void> {},
+      },
+    ],
     destinationSkillsFolder: '${HOME}/.cursor/skills',
     isSupportedModelType(type): boolean {
       return type.name === 'cursor';
     },
-    async preWorkspaceStart(): Promise<void> {
-      throw new Error('not implemented');
+    async preWorkspaceStart(context: AgentWorkspaceContext): Promise<void> {
+      const configFile = context.configurationFiles.find(f => f.path === CURSOR_CLI_CONFIG_PATH);
+      if (!configFile) {
+        return;
+      }
+
+      const content = await configFile.read();
+      let config: Record<string, unknown>;
+      try {
+        config = JSON.parse(content) as Record<string, unknown>;
+      } catch {
+        config = {};
+      }
+
+      const modelName = context.model.model.label;
+      config['model'] = {
+        modelId: modelName,
+        displayModelId: modelName,
+        displayName: modelName,
+        displayNameShort: modelName,
+        maxMode: false,
+      };
+      config['hasChangedDefaultModel'] = true;
+
+      await configFile.update(JSON.stringify(config, undefined, 2));
     },
   });
   extensionContext.subscriptions.push(disposable);
