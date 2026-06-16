@@ -17,7 +17,7 @@
  ***********************************************************************/
 import { randomInt } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 import type {
@@ -32,6 +32,7 @@ import type {
 } from '@openkaiden/api';
 import { Uri } from '@openkaiden/api';
 import type { ContainerExtensionAPI } from '@openkaiden/container-extension-api';
+import { sanitizeContainerName } from '@openkaiden/container-extension-api/container-name';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import type Dockerode from 'dockerode';
 import { inject, injectable } from 'inversify';
@@ -272,8 +273,7 @@ export class ConnectionManager {
 
     logger?.log(`Connection name: ${name}`);
 
-    const workspacePath = join(this.extensionContext.storagePath, name);
-    await mkdir(workspacePath, { recursive: true });
+    let safeName = sanitizeContainerName(name);
 
     const endpoint = this.containerExtensionAPI.getEndpoints()[0];
     if (!endpoint) {
@@ -281,19 +281,39 @@ export class ConnectionManager {
     }
     const dockerode = endpoint.dockerode;
 
+    const existingContainers = await dockerode.listContainers({ all: true });
+    const existingNames = new Set(existingContainers.flatMap(c => c.Names ?? []));
+    const storageRoot = this.extensionContext.storagePath;
+    const baseSafeName = safeName;
+    let suffix = 1;
+    while (true) {
+      const storageExists = await access(join(storageRoot, safeName)).then(
+        () => true,
+        () => false,
+      );
+      if (!existingNames.has(`/docling-${safeName}`) && !storageExists) {
+        break;
+      }
+      suffix++;
+      safeName = `${baseSafeName}-${suffix}`;
+    }
+
+    const workspacePath = join(storageRoot, safeName);
+    await mkdir(workspacePath, { recursive: true });
+
     const isImageAvailable = await this.checkDoclingImage(dockerode);
     if (!isImageAvailable) {
       await this.pullDoclingImage(dockerode);
     }
 
     const port = getRandomPort();
-    const containerName = `docling-${name}`;
+    const containerName = `docling-${safeName}`;
 
     logger?.log(`Starting Docling container ${containerName} on port ${port}...`);
     const container = await dockerode.createContainer({
       name: containerName,
       Labels: {
-        [DOCLING_NAME_LABEL]: name,
+        [DOCLING_NAME_LABEL]: safeName,
         [DOCLING_PORT_LABEL]: `${port}`,
       },
       Image: DOCLING_IMAGE,
@@ -330,7 +350,7 @@ export class ConnectionManager {
     await this.registerConnection({
       path: endpoint.path,
       containerId: container.id,
-      name,
+      name: safeName,
       port,
       running: true,
     });

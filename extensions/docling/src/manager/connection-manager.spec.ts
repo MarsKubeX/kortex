@@ -17,7 +17,7 @@
  ***********************************************************************/
 
 import { openAsBlob } from 'node:fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type {
@@ -60,6 +60,7 @@ beforeEach(async () => {
 
   (extensionContextMock as { subscriptions: Disposable[] }).subscriptions = [];
 
+  vi.mocked(access).mockRejectedValue(new Error('ENOENT'));
   vi.mocked(mkdir).mockResolvedValue(undefined);
   vi.mocked(rm).mockResolvedValue(undefined);
   vi.mocked(writeFile).mockResolvedValue(undefined);
@@ -230,6 +231,21 @@ describe('ConnectionManager', () => {
             start: expect.any(Function),
             stop: expect.any(Function),
             delete: expect.any(Function),
+          }),
+        }),
+      );
+    });
+
+    test('should sanitize name with spaces for container naming', async () => {
+      vi.mocked(global.fetch).mockResolvedValue({ ok: true } as Response);
+
+      await connectionManager.factory({ 'docling.name': 'my chunker' });
+
+      expect(dockerodeMock.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'docling-my-chunker',
+          Labels: expect.objectContaining({
+            'ai.openkaiden.docling.name': 'my-chunker',
           }),
         }),
       );
