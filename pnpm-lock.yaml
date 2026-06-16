@@ -555,8 +555,8 @@ importers:
   extensions/gemini:
     dependencies:
       '@ai-sdk/google':
-        specifier: ^3.0.79
-        version: 3.0.80(zod@4.4.3)
+        specifier: ^3.0.81
+        version: 3.0.81(zod@4.4.3)
       '@google/genai':
         specifier: ^1.25.0
         version: 1.43.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))
@@ -1132,6 +1132,12 @@ packages:
 
   '@ai-sdk/google@3.0.80':
     resolution: {integrity: sha512-5ORbm/yFUPO0MEvZsxBMN0cdKw2+lwU/wVn5KN3KF8Dmk1LughuDuUohMh/7iU/XFTiyB0OvmTW/tdV/J7O9zg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/google@3.0.81':
+    resolution: {integrity: sha512-Xvr/bAdWY/KC63wd593OJwYtRBXFqDpmbQNMPX5HZTTYs6kYFMJ1KQJ/trwUiD/0RxyIsxIjE/b2SfdKEbBnBg==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -8134,6 +8140,12 @@ snapshots:
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
+      zod: 4.4.3
+
+  '@ai-sdk/google@3.0.81(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.10
+      '@ai-sdk/provider-utils': 4.0.28(zod@4.4.3)
       zod: 4.4.3
 
   '@ai-sdk/mcp@1.0.46(zod@4.3.6)':
