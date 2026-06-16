@@ -76,7 +76,7 @@ function getSecondBadge(status: string): BadgeInfo | undefined {
 </script>
 
 <div class="flex flex-wrap gap-3">
-  {#each connections as connection (connection.providerId + ':' + connection.connectionName)}
+  {#each connections as connection (connection.providerId + ':' + connection.connectionId)}
     {@const status = effectiveStatus(connection)}
     {@const primaryBadge = getStatusBadge(status)}
     {@const secondaryBadge = getSecondBadge(status)}

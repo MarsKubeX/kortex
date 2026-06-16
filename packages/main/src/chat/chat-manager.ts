@@ -378,7 +378,7 @@ export class ChatManager {
         tools: params.tools,
         modelId: params.modelId,
         connectionId: params.connectionId,
-        connectionName: params.connectionName,
+        connectionName: this.providerRegistry.getInferenceConnectionName(params.providerId, params.connectionId),
         providerId: params.providerId,
         type: this.providerRegistry.getInferenceConnectionType(params.providerId, params.connectionId),
         endpoint: this.providerRegistry.getInferenceConnectionEndpoint(params.providerId, params.connectionId),

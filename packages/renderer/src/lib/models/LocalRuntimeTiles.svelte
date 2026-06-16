@@ -60,7 +60,7 @@ function getStatusBadges(status: string): BadgeInfo[] {
 </script>
 
 <div class="flex flex-wrap gap-3">
-  {#each connections as connection (connection.providerId + ':' + connection.connectionName)}
+  {#each connections as connection (connection.providerId + ':' + connection.connectionId)}
     {@const status = effectiveStatus(connection)}
     {@const badges = getStatusBadges(status)}
     <div

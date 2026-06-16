@@ -50,7 +50,6 @@ export interface DetectFlowFieldsParams {
   prompt: string;
   providerId: string;
   connectionId: string;
-  connectionName: string;
   modelId: string;
 }
 

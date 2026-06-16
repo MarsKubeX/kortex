@@ -137,10 +137,7 @@ function filterConnectionsBySearch(conns: InferenceConnectionSummary[], term: st
   if (!term.trim()) return conns;
   const q = term.trim().toLowerCase();
   return conns.filter(
-    c =>
-      c.providerName.toLowerCase().includes(q) ||
-      (c.connectionName?.toLowerCase().includes(q) ?? false) ||
-      (c.connectionType?.toLowerCase().includes(q) ?? false),
+    c => c.providerName.toLowerCase().includes(q) || (c.connectionType?.toLowerCase().includes(q) ?? false),
   );
 }
 

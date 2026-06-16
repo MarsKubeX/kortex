@@ -2227,6 +2227,18 @@ export class ProviderRegistry {
     return connection.endpoint;
   }
 
+  getInferenceConnectionName(providerId: string, connectionId: string): string {
+    const internalId = this.getMatchingProviderInternalId(providerId);
+    const provider = this.providers.get(internalId);
+    if (!provider) throw new Error('Provider not found');
+
+    const connection =
+      provider.inferenceConnections.find(({ id }) => id === connectionId) ??
+      provider.inferenceConnections.find(({ name }) => name === connectionId);
+    if (!connection) throw new Error('Connection not found');
+    return connection.name;
+  }
+
   getFirstInferenceSDK(providerName: string): ProviderV3 {
     const provider = this.providers.values().find(provider => provider.id === providerName);
     if (!provider) throw new Error('Provider not found');

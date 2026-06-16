@@ -21,7 +21,6 @@ import type { UIMessage } from 'ai';
 export interface InferenceParameters {
   providerId: string;
   connectionId: string;
-  connectionName: string;
   modelId: string;
   tools: Record<string, Array<string>>;
   messages: UIMessage[];

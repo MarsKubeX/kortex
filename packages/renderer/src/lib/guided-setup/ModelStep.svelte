@@ -51,7 +51,6 @@ $effect(() => {
     const sel: DefaultWorkspaceModelSettings = {
       providerId: effectiveModel.providerId,
       connectionId: effectiveModel.connectionId,
-      connectionName: effectiveModel.connectionName,
       label: effectiveModel.label,
     };
     onboarding.model = sel;

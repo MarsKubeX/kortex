@@ -74,11 +74,10 @@ async function handleDetectFields(): Promise<void> {
 
   try {
     const result = await window.inferenceDetectFlowFields({
-      chatId, // Optional - provides additional context if available
+      chatId,
       prompt,
       providerId: selectedModel.providerId,
       connectionId: selectedModel.connectionId,
-      connectionName: selectedModel.connectionName,
       modelId: selectedModel.label,
     });
 
