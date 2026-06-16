@@ -16,11 +16,17 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { Disposable, ExtensionContext, SecretStorage } from '@openkaiden/api';
+import type {
+  AgentConfigurationFile,
+  AgentWorkspaceContext,
+  Disposable,
+  ExtensionContext,
+  SecretStorage,
+} from '@openkaiden/api';
 import { agents, provider } from '@openkaiden/api';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { activate } from './extension';
+import { activate, GEMINI_SETTINGS_PATH } from './extension';
 import { Gemini } from './gemini';
 
 vi.mock(import('@openkaiden/api'));
@@ -77,5 +83,127 @@ describe('activate', () => {
     expect(agent.isSupportedModelType!({ name: 'gemini' })).toBe(true);
     expect(agent.isSupportedModelType!({ name: 'openai' })).toBe(false);
     expect(agent.isSupportedModelType!({ name: 'anthropic' })).toBe(false);
+  });
+
+  test('registers agent with settings.json configuration file', async () => {
+    await activate(extensionContextMock);
+
+    const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+    expect(agent.configurationFiles).toHaveLength(1);
+    expect(agent.configurationFiles[0]!.path).toBe(GEMINI_SETTINGS_PATH);
+  });
+
+  describe('preWorkspaceStart', () => {
+    function createContext(
+      configFiles: AgentConfigurationFile[],
+      modelLabel = 'gemini-2.5-pro',
+    ): AgentWorkspaceContext {
+      return {
+        model: {
+          model: { label: modelLabel },
+        },
+        configurationFiles: configFiles,
+      };
+    }
+
+    test('writes model configuration into settings.json', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const configFile: AgentConfigurationFile = {
+        path: GEMINI_SETTINGS_PATH,
+        read: vi.fn().mockResolvedValue('{}'),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile]));
+
+      expect(updateMock).toHaveBeenCalledOnce();
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written).toEqual({
+        model: {
+          name: 'gemini-2.5-pro',
+        },
+      });
+    });
+
+    test('preserves existing configuration fields', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const existingConfig = JSON.stringify({ customSetting: 'keep-me', version: 2 });
+      const configFile: AgentConfigurationFile = {
+        path: GEMINI_SETTINGS_PATH,
+        read: vi.fn().mockResolvedValue(existingConfig),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile], 'gemini-2.5-flash'));
+
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written.customSetting).toBe('keep-me');
+      expect(written.version).toBe(2);
+      expect(written.model.name).toBe('gemini-2.5-flash');
+    });
+
+    test.each([
+      'null',
+      '"a string"',
+      '123',
+      'true',
+      '[1, 2]',
+    ])('falls back to empty config when parsed JSON is non-object: %s', async (payload: string) => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const configFile: AgentConfigurationFile = {
+        path: GEMINI_SETTINGS_PATH,
+        read: vi.fn().mockResolvedValue(payload),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile]));
+
+      expect(updateMock).toHaveBeenCalledOnce();
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written.model.name).toBe('gemini-2.5-pro');
+    });
+
+    test('handles invalid JSON by starting with empty config', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const configFile: AgentConfigurationFile = {
+        path: GEMINI_SETTINGS_PATH,
+        read: vi.fn().mockResolvedValue('not valid json'),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([configFile]));
+
+      expect(updateMock).toHaveBeenCalledOnce();
+      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+      expect(written.model.name).toBe('gemini-2.5-pro');
+    });
+
+    test('does nothing when config file is not in context', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      const updateMock = vi.fn();
+      const otherFile: AgentConfigurationFile = {
+        path: 'some/other/path.json',
+        read: vi.fn(),
+        update: updateMock,
+      };
+
+      await agent.preWorkspaceStart(createContext([otherFile]));
+
+      expect(updateMock).not.toHaveBeenCalled();
+    });
   });
 });
