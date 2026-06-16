@@ -165,6 +165,27 @@ describe('activate', () => {
       expect(written.hasChangedDefaultModel).toBe(true);
     });
 
+    test('normalizes non-object JSON to empty config', async () => {
+      await activate(extensionContextMock);
+      const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
+
+      for (const nonObject of ['null', '"string"', '123', '[]']) {
+        const updateMock = vi.fn();
+        const configFile: AgentConfigurationFile = {
+          path: CURSOR_CLI_CONFIG_PATH,
+          read: vi.fn().mockResolvedValue(nonObject),
+          update: updateMock,
+        };
+
+        await agent.preWorkspaceStart(createContext([configFile]));
+
+        expect(updateMock).toHaveBeenCalledOnce();
+        const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
+        expect(written.model.modelId).toBe('gpt-4o');
+        expect(written.hasChangedDefaultModel).toBe(true);
+      }
+    });
+
     test('does nothing when config file is not in context', async () => {
       await activate(extensionContextMock);
       const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];

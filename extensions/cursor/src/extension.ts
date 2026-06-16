@@ -60,7 +60,11 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
       const content = await configFile.read();
       let config: Record<string, unknown>;
       try {
-        config = JSON.parse(content) as Record<string, unknown>;
+        const parsed: unknown = JSON.parse(content);
+        config =
+          parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {};
       } catch {
         config = {};
       }
