@@ -45,7 +45,6 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
         async read(): Promise<string> {
           return '{}';
         },
-        async update(): Promise<void> {},
       },
     ],
     destinationSkillsFolder: '${HOME}/.cursor/skills',
