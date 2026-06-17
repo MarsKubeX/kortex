@@ -53,6 +53,8 @@ vi.mock(import('/@/stores/model-catalog'), async () => {
   return {
     disabledModels: writable<Set<string>>(new Set()),
     modelKey: (providerId: string, label: string): string => `${providerId}::${label}`,
+    modelSelectionKey: (providerId: string, connectionId: string, label: string): string =>
+      `${providerId}::${connectionId}::${label}`,
     isModelEnabled: (): boolean => true,
     toggleModel: vi.fn(),
   };

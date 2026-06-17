@@ -128,6 +128,9 @@ beforeEach(() => {
   vi.mocked(modelCatalogStore.modelKey).mockImplementation(
     (providerId: string, label: string): string => `${providerId}::${label}`,
   );
+  vi.mocked(modelCatalogStore.modelSelectionKey).mockImplementation(
+    (providerId: string, connectionId: string, label: string): string => `${providerId}::${connectionId}::${label}`,
+  );
   vi.mocked(window.checkAgentWorkspaceConfigExists).mockResolvedValue(false);
   vi.mocked(window.showMessageBox).mockResolvedValue({ response: 0 });
   resetDraft();

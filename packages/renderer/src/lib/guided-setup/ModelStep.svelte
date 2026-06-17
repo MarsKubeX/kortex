@@ -6,7 +6,7 @@ import { SvelteSet } from 'svelte/reactivity';
 import { agentDefinitions, matchesModelFilter } from '/@/lib/guided-setup/agent-registry';
 import type { CatalogModelInfo } from '/@/lib/models/models-utils';
 import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
-import { disabledModels, isModelEnabled, modelKey } from '/@/stores/model-catalog';
+import { disabledModels, isModelEnabled, modelKey, modelSelectionKey } from '/@/stores/model-catalog';
 import { catalogModels } from '/@/stores/models';
 import type { DefaultWorkspaceModelSettings } from '/@api/onboarding-settings-info';
 
@@ -15,7 +15,11 @@ import type { GuidedSetupStepProps } from './guided-setup-steps';
 let { onboarding }: GuidedSetupStepProps = $props();
 
 let userSelectionKey = $state(
-  untrack(() => (onboarding.model ? modelKey(onboarding.model.providerId, onboarding.model.label) : '')),
+  untrack(() =>
+    onboarding.model
+      ? modelSelectionKey(onboarding.model.providerId, onboarding.model.connectionId, onboarding.model.label)
+      : '',
+  ),
 );
 
 let agentDef = $derived(agentDefinitions.find(d => d.cliName === onboarding.agent));
@@ -39,7 +43,9 @@ let agentFilteredModels: CatalogModelInfo[] = $derived.by(() => {
 
 let effectiveModel: CatalogModelInfo | undefined = $derived.by(() => {
   if (userSelectionKey) {
-    const match = agentFilteredModels.find(m => modelKey(m.providerId, m.label) === userSelectionKey);
+    const match = agentFilteredModels.find(
+      m => modelSelectionKey(m.providerId, m.connectionId, m.label) === userSelectionKey,
+    );
     if (match) return match;
   }
   return agentFilteredModels.length > 0 ? agentFilteredModels[0] : undefined;
@@ -60,7 +66,7 @@ $effect(() => {
 });
 
 function selectModel(model: CatalogModelInfo): void {
-  userSelectionKey = modelKey(model.providerId, model.label);
+  userSelectionKey = modelSelectionKey(model.providerId, model.connectionId, model.label);
 }
 </script>
 
@@ -83,7 +89,7 @@ function selectModel(model: CatalogModelInfo): void {
 
     <ModelSelectionTable
       models={agentFilteredModels}
-      selectedKey={effectiveModel ? modelKey(effectiveModel.providerId, effectiveModel.label) : ''}
+      selectedKey={effectiveModel ? modelSelectionKey(effectiveModel.providerId, effectiveModel.connectionId, effectiveModel.label) : ''}
       showCatalogLink={false}
       onselect={selectModel} />
   </div>

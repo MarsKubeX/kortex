@@ -8,7 +8,7 @@ import type { CatalogModelInfo, InferenceConnectionSummary } from '/@/lib/models
 import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
 import ProviderConnectionTiles from '/@/lib/models/ProviderConnectionTiles.svelte';
 import { inferenceConnectionSummariesData } from '/@/stores/inference-connection-summaries';
-import { modelKey } from '/@/stores/model-catalog';
+import { modelSelectionKey } from '/@/stores/model-catalog';
 import { catalogModels } from '/@/stores/models';
 import type { AgentInfo } from '/@api/agent-info';
 import type { DefaultPerAgentWorkspaceSettings, DefaultWorkspaceSettings } from '/@api/onboarding-settings-info';
@@ -43,7 +43,7 @@ let saving = $state(false);
 
 let hasChanges = $derived(selectedModelKey !== '' && selectedModelKey !== savedModelKey);
 let selectedModel: CatalogModelInfo | undefined = $derived(
-  compatibleModels.find(m => modelKey(m.providerId, m.label) === selectedModelKey),
+  compatibleModels.find(m => modelSelectionKey(m.providerId, m.connectionId, m.label) === selectedModelKey),
 );
 
 async function loadSavedModel(): Promise<void> {
@@ -53,7 +53,11 @@ async function loadSavedModel(): Promise<void> {
     );
     const agentSettings = existing?.defaultAgentSettings?.[agentInfo.id];
     if (agentSettings?.defaultModel) {
-      const key = modelKey(agentSettings.defaultModel.providerId, agentSettings.defaultModel.label);
+      const key = modelSelectionKey(
+        agentSettings.defaultModel.providerId,
+        agentSettings.defaultModel.connectionId,
+        agentSettings.defaultModel.label,
+      );
       savedModelKey = key;
       selectedModelKey = key;
     }
@@ -67,7 +71,7 @@ $effect(() => {
 });
 
 function selectModel(model: CatalogModelInfo): void {
-  selectedModelKey = modelKey(model.providerId, model.label);
+  selectedModelKey = modelSelectionKey(model.providerId, model.connectionId, model.label);
 }
 
 function discardChanges(): void {
