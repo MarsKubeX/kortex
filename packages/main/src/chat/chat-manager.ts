@@ -257,7 +257,7 @@ export class ChatManager {
     userMessage: UIMessage;
   }> {
     const internalProviderId = this.providerRegistry.getMatchingProviderInternalId(params.providerId);
-    const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionName);
+    const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionId);
     const model = sdk.languageModel(params.modelId);
 
     const userMessage = this.getMostRecentUserMessage(params.messages);
@@ -366,7 +366,7 @@ export class ChatManager {
         this.webContents.send('api-sender', 'chat-list-updated');
 
         const internalProviderId = this.providerRegistry.getMatchingProviderInternalId(params.providerId);
-        const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionName);
+        const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionId);
         const model = sdk.languageModel(params.modelId);
         this.generateTitleInBackground(model, userMessage, chatId, placeholderTitle, abortController.signal);
       }
@@ -377,10 +377,11 @@ export class ChatManager {
       const config: MessageConfig = {
         tools: params.tools,
         modelId: params.modelId,
-        connectionName: params.connectionName,
+        connectionId: params.connectionId,
+        connectionName: this.providerRegistry.getInferenceConnectionName(params.providerId, params.connectionId),
         providerId: params.providerId,
-        type: this.providerRegistry.getInferenceConnectionType(params.providerId, params.connectionName),
-        endpoint: this.providerRegistry.getInferenceConnectionEndpoint(params.providerId, params.connectionName),
+        type: this.providerRegistry.getInferenceConnectionType(params.providerId, params.connectionId),
+        endpoint: this.providerRegistry.getInferenceConnectionEndpoint(params.providerId, params.connectionId),
       };
       await this.chatQueries.saveMessages({
         messages: [
@@ -544,7 +545,7 @@ export class ChatManager {
   async detectFlowFields(params: DetectFlowFieldsParams): Promise<DetectFlowFieldsResult> {
     // Get model SDK
     const internalProviderId = this.providerRegistry.getMatchingProviderInternalId(params.providerId);
-    const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionName);
+    const sdk = this.providerRegistry.getInferenceSDK(internalProviderId, params.connectionId);
     const model = sdk.languageModel(params.modelId);
 
     let extractedParams: FlowParameterAIGenerated[] = [];

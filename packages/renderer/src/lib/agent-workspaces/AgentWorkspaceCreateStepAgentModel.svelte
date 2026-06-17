@@ -9,7 +9,7 @@ import type { CatalogModelInfo } from '/@/lib/models/models-utils';
 import ModelSelectionTable from '/@/lib/models/ModelSelectionTable.svelte';
 import { agentInfos } from '/@/stores/agents';
 import { agentWorkspaceRuntime } from '/@/stores/agentworkspace-runtime';
-import { disabledModels, isModelEnabled, modelKey } from '/@/stores/model-catalog';
+import { disabledModels, isModelEnabled, modelKey, modelSelectionKey } from '/@/stores/model-catalog';
 import { catalogModels } from '/@/stores/models';
 
 interface Props {
@@ -45,7 +45,9 @@ let agentFilteredModels: CatalogModelInfo[] = $derived(filterByAgent(allModels, 
 
 let selectedAgentLabel: string = $derived($agentInfos.find(a => a.id === selectedAgent)?.name ?? 'the selected agent');
 
-let selectedKey: string = $derived(selectedModel ? modelKey(selectedModel.providerId, selectedModel.label) : '');
+let selectedKey: string = $derived(
+  selectedModel ? modelSelectionKey(selectedModel.providerId, selectedModel.connectionId, selectedModel.label) : '',
+);
 
 function filterByAgent(models: CatalogModelInfo[], agent: string): CatalogModelInfo[] {
   if (!agent) return models;
@@ -69,7 +71,9 @@ $effect(() => {
   const current = untrack(() => selectedModel);
   if (current) {
     const stillEligible = models.some(
-      m => modelKey(m.providerId, m.label) === modelKey(current.providerId, current.label),
+      m =>
+        modelSelectionKey(m.providerId, m.connectionId, m.label) ===
+        modelSelectionKey(current.providerId, current.connectionId, current.label),
     );
     if (stillEligible) return;
   }

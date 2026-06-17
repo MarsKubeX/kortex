@@ -175,6 +175,9 @@ beforeEach(() => {
   vi.mocked(modelCatalogStore.modelKey).mockImplementation(
     (providerId: string, label: string): string => `${providerId}::${label}`,
   );
+  vi.mocked(modelCatalogStore.modelSelectionKey).mockImplementation(
+    (providerId: string, connectionId: string, label: string): string => `${providerId}::${connectionId}::${label}`,
+  );
 });
 
 afterEach(() => {

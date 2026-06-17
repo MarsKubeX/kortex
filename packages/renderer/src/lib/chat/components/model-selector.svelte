@@ -3,9 +3,9 @@ import type { ModelInfo } from '/@/lib/chat/components/model-info';
 
 export function groupAndSortModels(models: Array<ModelInfo>): Map<string, Array<ModelInfo>> {
   return new Map(
-    Array.from(
-      Map.groupBy(models, ({ providerId, connectionName }) => `${providerId}:${connectionName}`).entries(),
-    ).map(([key, models]) => [key, models.toSorted((a, b) => a.label.localeCompare(b.label))]),
+    Array.from(Map.groupBy(models, ({ providerId, connectionId }) => `${providerId}:${connectionId}`).entries()).map(
+      ([key, models]) => [key, models.toSorted((a, b) => a.label.localeCompare(b.label))],
+    ),
   );
 }
 </script>
@@ -52,7 +52,7 @@ const selectedChatModelDetails = $derived(
       model =>
         model.label === value?.label &&
         model.providerId === value?.providerId &&
-        model.connectionName === value?.connectionName,
+        model.connectionId === value?.connectionId,
     ),
 );
 
@@ -109,7 +109,7 @@ $effect(() => {
           <DropdownMenuItem
             onSelect={onSelect.bind(undefined, model)}
             class="group/item flex flex-row items-center justify-between gap-4"
-            data-active={model.label === value?.label && model.providerId === value?.providerId && model.connectionName === value?.connectionName}
+            data-active={model.label === value?.label && model.providerId === value?.providerId && model.connectionId === value?.connectionId}
           >
             <div class="flex flex-col items-start gap-1">
               <div>{model.label}</div>

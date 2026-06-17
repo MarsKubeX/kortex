@@ -57,6 +57,10 @@ export function modelKey(providerId: string, label: string): string {
   return `${providerId}::${label}`;
 }
 
+export function modelSelectionKey(providerId: string, connectionId: string, label: string): string {
+  return `${providerId}::${connectionId}::${label}`;
+}
+
 export function toggleModel(providerId: string, label: string): void {
   disabledModels.update(set => {
     const key = modelKey(providerId, label);

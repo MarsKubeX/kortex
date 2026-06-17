@@ -20,7 +20,7 @@ import type { AgentWorkspaceConfiguration } from './agent-workspace-info.js';
 
 export interface DefaultWorkspaceModelSettings {
   providerId: string;
-  connectionName: string;
+  connectionId: string;
   label: string;
 }
 

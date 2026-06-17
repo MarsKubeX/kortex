@@ -53,6 +53,8 @@ vi.mock(import('/@/stores/model-catalog'), async () => {
   return {
     disabledModels: writable<Set<string>>(new Set()),
     modelKey: (providerId: string, label: string): string => `${providerId}::${label}`,
+    modelSelectionKey: (providerId: string, connectionId: string, label: string): string =>
+      `${providerId}::${connectionId}::${label}`,
     isModelEnabled: (): boolean => true,
     toggleModel: vi.fn(),
   };
@@ -178,7 +180,7 @@ describe('opencode agent models', () => {
     await waitFor(() => {
       expect(onboarding.model).toEqual({
         providerId: 'ollama',
-        connectionName: 'default',
+        connectionId: 'conn-0',
         label: 'llama3.2:3b',
       });
     });
@@ -210,7 +212,7 @@ describe('claude agent models', () => {
     await waitFor(() => {
       expect(onboarding.model).toEqual({
         providerId: 'claude',
-        connectionName: 'api-key',
+        connectionId: 'conn-0',
         label: 'claude-sonnet-4-20250514',
       });
     });
@@ -228,7 +230,7 @@ describe('model selection', () => {
     await waitFor(() => {
       expect(onboarding.model).toEqual({
         providerId: 'ollama',
-        connectionName: 'default',
+        connectionId: 'conn-0',
         label: 'codellama:7b',
       });
     });
@@ -238,7 +240,7 @@ describe('model selection', () => {
     stubProviders(OPENCODE_PROVIDERS);
     renderStep({
       agent: 'opencode',
-      model: { providerId: 'ollama', connectionName: 'ollama', label: 'codellama:7b' },
+      model: { providerId: 'ollama', connectionId: 'conn-0', label: 'codellama:7b' },
     });
 
     await waitFor(() => {
@@ -250,7 +252,11 @@ describe('model selection', () => {
   });
 
   test('preserves model when catalog is empty (loading)', async () => {
-    const seeded = { providerId: 'claude', connectionName: 'claude', label: 'claude-sonnet-4-20250514' };
+    const seeded = {
+      providerId: 'claude',
+      connectionId: 'conn-0',
+      label: 'claude-sonnet-4-20250514',
+    };
     stubProviders([]);
     renderStep({ agent: 'claude', model: seeded });
 

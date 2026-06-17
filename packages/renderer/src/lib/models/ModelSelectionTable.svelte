@@ -4,7 +4,7 @@ import { StatusIcon } from '@podman-desktop/ui-svelte';
 import { Icon } from '@podman-desktop/ui-svelte/icons';
 
 import { handleNavigation } from '/@/navigation';
-import { modelKey } from '/@/stores/model-catalog';
+import { modelSelectionKey } from '/@/stores/model-catalog';
 import { NavigationPage } from '/@api/navigation-page';
 
 import type { CatalogModelInfo } from './models-utils';
@@ -58,7 +58,7 @@ function filterBySearch(allModels: CatalogModelInfo[], term: string): CatalogMod
 }
 
 function getKey(model: CatalogModelInfo): string {
-  return modelKey(model.providerId, model.label);
+  return modelSelectionKey(model.providerId, model.connectionId, model.label);
 }
 
 function getModelStatus(model: CatalogModelInfo): string {

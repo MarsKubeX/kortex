@@ -128,6 +128,9 @@ beforeEach(() => {
   vi.mocked(modelCatalogStore.modelKey).mockImplementation(
     (providerId: string, label: string): string => `${providerId}::${label}`,
   );
+  vi.mocked(modelCatalogStore.modelSelectionKey).mockImplementation(
+    (providerId: string, connectionId: string, label: string): string => `${providerId}::${connectionId}::${label}`,
+  );
   vi.mocked(window.checkAgentWorkspaceConfigExists).mockResolvedValue(false);
   vi.mocked(window.showMessageBox).mockResolvedValue({ response: 0 });
   resetDraft();
@@ -870,7 +873,7 @@ test('Expect default model from onboarding.defaultWorkspaceSettings when valid',
     defaultAgent: 'opencode',
     defaultAgentSettings: {
       opencode: {
-        defaultModel: { providerId: 'claude', connectionName: 'Anthropic Cloud', label: 'claude-sonnet-4' },
+        defaultModel: { providerId: 'claude', connectionId: 'conn-0', label: 'claude-sonnet-4' },
       },
     },
   });
@@ -1171,7 +1174,7 @@ test('Expect createAgentWorkspace called with workspaceConfiguration from settin
     defaultAgent: 'claude',
     defaultAgentSettings: {
       claude: {
-        defaultModel: { providerId: 'claude', connectionName: 'Anthropic Cloud', label: 'claude-sonnet-4' },
+        defaultModel: { providerId: 'claude', connectionId: 'conn-0', label: 'claude-sonnet-4' },
         workspaceConfiguration: {
           environment: [
             { name: 'CLAUDE_CODE_USE_VERTEX', value: '1' },
@@ -1222,7 +1225,7 @@ test('Expect workspaceConfiguration undefined when no settings for selected agen
     defaultAgent: 'opencode',
     defaultAgentSettings: {
       opencode: {
-        defaultModel: { providerId: 'claude', connectionName: 'Anthropic Cloud', label: 'claude-sonnet-4' },
+        defaultModel: { providerId: 'claude', connectionId: 'conn-0', label: 'claude-sonnet-4' },
       },
     },
   });

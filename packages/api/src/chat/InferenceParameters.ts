@@ -20,7 +20,7 @@ import type { UIMessage } from 'ai';
 
 export interface InferenceParameters {
   providerId: string;
-  connectionName: string;
+  connectionId: string;
   modelId: string;
   tools: Record<string, Array<string>>;
   messages: UIMessage[];

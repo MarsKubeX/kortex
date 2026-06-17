@@ -49,7 +49,7 @@ export interface DetectFlowFieldsParams {
   chatId?: string; // Optional - if provided, analyzes chat + prompt; if not, analyzes prompt only
   prompt: string;
   providerId: string;
-  connectionName: string;
+  connectionId: string;
   modelId: string;
 }
 

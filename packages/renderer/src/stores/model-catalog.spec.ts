@@ -20,7 +20,7 @@ import { get } from 'svelte/store';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { configurationProperties } from './configurationProperties';
-import { disabledModels, isModelEnabled, modelKey, toggleModel } from './model-catalog';
+import { disabledModels, isModelEnabled, modelKey, modelSelectionKey, toggleModel } from './model-catalog';
 
 const getConfigurationValueMock = vi.fn();
 const updateConfigurationValueMock = vi.fn();
@@ -35,6 +35,10 @@ beforeEach(() => {
 
 test('modelKey joins providerId and label with double colon', () => {
   expect(modelKey('gemini', 'gemini-2.5-flash')).toBe('gemini::gemini-2.5-flash');
+});
+
+test('modelSelectionKey joins providerId, connectionId and label with double colons', () => {
+  expect(modelSelectionKey('gemini', 'conn-1', 'gemini-2.5-flash')).toBe('gemini::conn-1::gemini-2.5-flash');
 });
 
 test('toggleModel adds then removes model from disabled set', () => {

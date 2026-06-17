@@ -37,7 +37,7 @@ const exportAsFlow = async (): Promise<void> => {
   loadingExportAsFlow = true;
 
   try {
-    const { providerId, connectionName, label } = selectedModel;
+    const { providerId, connectionId, label } = selectedModel;
 
     const tools: Record<string, string[]> = Object.fromEntries(
       selectedMCPTools.entries().reduce(
@@ -53,7 +53,7 @@ const exportAsFlow = async (): Promise<void> => {
 
     const generatedFlowParams = await window.inferenceGenerateFlowParams({
       providerId,
-      connectionName,
+      connectionId,
       modelId: label,
       tools: tools,
       messages: $state.snapshot(chatClient.messages) as UIMessage[],

@@ -33,21 +33,21 @@ describe('ModelSelector', () => {
     const models: ModelInfo[] = [
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'Zebra Model',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'Alpha Model',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'Model Beta',
         type: 'cloud',
@@ -55,7 +55,7 @@ describe('ModelSelector', () => {
     ];
 
     const groups = groupAndSortModels(models);
-    const provider1Models = groups.get('provider1:connection1')!;
+    const provider1Models = groups.get('provider1:conn-1')!;
 
     expect(provider1Models).toHaveLength(3);
     expect(provider1Models[0].label).toBe('Alpha Model');
@@ -65,21 +65,21 @@ describe('ModelSelector', () => {
 
   test('should sort models alphabetically across multiple groups', () => {
     const models: ModelInfo[] = [
-      { providerId: 'provider1', connectionId: 'conn-0', connectionName: 'connection1', label: 'Zebra', type: 'cloud' },
-      { providerId: 'provider1', connectionId: 'conn-0', connectionName: 'connection1', label: 'Alpha', type: 'cloud' },
-      { providerId: 'provider2', connectionId: 'conn-0', connectionName: 'connection2', label: 'Zulu', type: 'cloud' },
-      { providerId: 'provider2', connectionId: 'conn-0', connectionName: 'connection2', label: 'Bravo', type: 'cloud' },
+      { providerId: 'provider1', connectionId: 'conn-1', connectionName: 'connection1', label: 'Zebra', type: 'cloud' },
+      { providerId: 'provider1', connectionId: 'conn-1', connectionName: 'connection1', label: 'Alpha', type: 'cloud' },
+      { providerId: 'provider2', connectionId: 'conn-2', connectionName: 'connection2', label: 'Zulu', type: 'cloud' },
+      { providerId: 'provider2', connectionId: 'conn-2', connectionName: 'connection2', label: 'Bravo', type: 'cloud' },
     ];
 
     const groups = groupAndSortModels(models);
 
     // First group should be sorted
-    const provider1Models = groups.get('provider1:connection1')!;
+    const provider1Models = groups.get('provider1:conn-1')!;
     expect(provider1Models[0].label).toBe('Alpha');
     expect(provider1Models[1].label).toBe('Zebra');
 
     // Second group should also be sorted
-    const provider2Models = groups.get('provider2:connection2')!;
+    const provider2Models = groups.get('provider2:conn-2')!;
     expect(provider2Models[0].label).toBe('Bravo');
     expect(provider2Models[1].label).toBe('Zulu');
   });
@@ -88,21 +88,21 @@ describe('ModelSelector', () => {
     const models: ModelInfo[] = [
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'model-c',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'Model-B',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'MODEL-A',
         type: 'cloud',
@@ -110,7 +110,7 @@ describe('ModelSelector', () => {
     ];
 
     const groups = groupAndSortModels(models);
-    const provider1Models = groups.get('provider1:connection1')!;
+    const provider1Models = groups.get('provider1:conn-1')!;
 
     // localeCompare handles case-insensitive comparison
     expect(provider1Models[0].label).toBe('MODEL-A');
@@ -122,28 +122,28 @@ describe('ModelSelector', () => {
     const models: ModelInfo[] = [
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'model-3.5-turbo',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'model-4',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'model-4-turbo',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'model-3',
         type: 'cloud',
@@ -151,7 +151,7 @@ describe('ModelSelector', () => {
     ];
 
     const groups = groupAndSortModels(models);
-    const provider1Models = groups.get('provider1:connection1')!;
+    const provider1Models = groups.get('provider1:conn-1')!;
 
     // localeCompare provides natural string sorting
     expect(provider1Models[0].label).toBe('model-3');
@@ -164,28 +164,28 @@ describe('ModelSelector', () => {
     const models: ModelInfo[] = [
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'Model Z',
         type: 'cloud',
       },
       {
         providerId: 'provider1',
-        connectionId: 'conn-0',
+        connectionId: 'conn-1',
         connectionName: 'connection1',
         label: 'Model A',
         type: 'cloud',
       },
       {
         providerId: 'provider2',
-        connectionId: 'conn-0',
+        connectionId: 'conn-2',
         connectionName: 'connection2',
         label: 'Model C',
         type: 'cloud',
       },
       {
         providerId: 'provider2',
-        connectionId: 'conn-0',
+        connectionId: 'conn-2',
         connectionName: 'connection2',
         label: 'Model B',
         type: 'cloud',
@@ -196,13 +196,13 @@ describe('ModelSelector', () => {
 
     // Should have two separate groups
     expect(groups.size).toBe(2);
-    expect(groups.get('provider1:connection1')).toHaveLength(2);
-    expect(groups.get('provider2:connection2')).toHaveLength(2);
+    expect(groups.get('provider1:conn-1')).toHaveLength(2);
+    expect(groups.get('provider2:conn-2')).toHaveLength(2);
 
     // Each group should be independently sorted
-    expect(groups.get('provider1:connection1')![0].label).toBe('Model A');
-    expect(groups.get('provider1:connection1')![1].label).toBe('Model Z');
-    expect(groups.get('provider2:connection2')![0].label).toBe('Model B');
-    expect(groups.get('provider2:connection2')![1].label).toBe('Model C');
+    expect(groups.get('provider1:conn-1')![0].label).toBe('Model A');
+    expect(groups.get('provider1:conn-1')![1].label).toBe('Model Z');
+    expect(groups.get('provider2:conn-2')![0].label).toBe('Model B');
+    expect(groups.get('provider2:conn-2')![1].label).toBe('Model C');
   });
 });

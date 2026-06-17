@@ -38,7 +38,6 @@ export interface InferenceConnectionSummary {
   providerId: string;
   providerInternalId: string;
   connectionId: string;
-  connectionName: string;
   connectionType?: InferenceProviderConnectionType;
   llmMetadata?: LLMMetadata;
   status: ProviderConnectionStatus | 'not-configured';
