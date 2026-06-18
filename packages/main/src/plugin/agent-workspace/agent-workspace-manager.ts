@@ -521,6 +521,10 @@ export class AgentWorkspaceManager implements Disposable {
           enum: ['podman', 'openshell'],
           default: 'podman',
         },
+        [`${AgentWorkspaceSettings.SectionName}.${AgentWorkspaceSettings.DefaultBaseImage}`]: {
+          description: 'Default base image for agent workspaces when the agent does not specify one.',
+          type: 'string',
+        },
       },
     };
     this.configurationRegistry.registerConfigurations([runtimeConfiguration]);
