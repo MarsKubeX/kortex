@@ -16,10 +16,12 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ExtensionContext } from '@openkaiden/api';
+import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents, provider } from '@openkaiden/api';
 
 import { Gemini } from './gemini';
+
+export const GEMINI_SETTINGS_PATH = '.gemini/settings.json';
 
 export async function activate(extensionContext: ExtensionContext): Promise<void> {
   console.log('starting gemini extension');
@@ -40,12 +42,41 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
     command: 'gemini',
     acp: { args: ['--acp'] },
     tags: ['Cloud'],
-    configurationFiles: [],
+    configurationFiles: [
+      {
+        path: GEMINI_SETTINGS_PATH,
+        async read(): Promise<string> {
+          return '{}';
+        },
+      },
+    ],
     isSupportedModelType(type): boolean {
       return type.name === 'gemini';
     },
-    async preWorkspaceStart(): Promise<void> {
-      throw new Error('not implemented');
+    async preWorkspaceStart(context: AgentWorkspaceContext): Promise<void> {
+      const configFile = context.configurationFiles.find(f => f.path === GEMINI_SETTINGS_PATH);
+      if (!configFile) {
+        return;
+      }
+
+      const content = await configFile.read();
+      let config: Record<string, unknown>;
+      try {
+        const parsed: unknown = JSON.parse(content);
+        config =
+          typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {};
+      } catch {
+        config = {};
+      }
+
+      const modelName = context.model.model.label;
+      config['model'] = {
+        name: modelName,
+      };
+
+      await configFile.update(JSON.stringify(config, undefined, 2));
     },
   });
   extensionContext.subscriptions.push(disposable);
