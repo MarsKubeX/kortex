@@ -18,10 +18,24 @@
 
 import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents } from '@openkaiden/api';
+import { z } from 'zod';
 
 import { CursorExtension } from './cursor-extension';
 
 export const CURSOR_CLI_CONFIG_PATH = '.cursor/cli-config.json';
+
+const CursorModelSchema = z.looseObject({
+  modelId: z.string(),
+  displayModelId: z.string(),
+  displayName: z.string(),
+  displayNameShort: z.string(),
+  maxMode: z.boolean(),
+});
+
+const CursorCliConfigSchema = z.looseObject({
+  model: CursorModelSchema.optional(),
+  hasChangedDefaultModel: z.boolean().optional(),
+});
 
 let cursorExtension: CursorExtension | undefined;
 
@@ -57,27 +71,16 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
         return;
       }
 
-      const content = await configFile.read();
-      let config: Record<string, unknown>;
-      try {
-        const parsed: unknown = JSON.parse(content);
-        config =
-          parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : {};
-      } catch {
-        config = {};
-      }
-
+      const config = CursorCliConfigSchema.parse(JSON.parse(await configFile.read()));
       const modelName = context.model.model.label;
-      config['model'] = {
+      config.model = {
         modelId: modelName,
         displayModelId: modelName,
         displayName: modelName,
         displayNameShort: modelName,
         maxMode: false,
       };
-      config['hasChangedDefaultModel'] = true;
+      config.hasChangedDefaultModel = true;
 
       await configFile.update(JSON.stringify(config, undefined, 2));
     },

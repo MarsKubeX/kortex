@@ -96,6 +96,7 @@ describe('activate', () => {
           model: { label: modelLabel },
         },
         configurationFiles: configFiles,
+        workspace: {},
       };
     }
 
@@ -146,44 +147,30 @@ describe('activate', () => {
       expect(written.model.modelId).toBe('claude-sonnet');
     });
 
-    test('handles invalid JSON by starting with empty config', async () => {
+    test('rejects invalid JSON', async () => {
       await activate(extensionContextMock);
       const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
 
-      const updateMock = vi.fn();
       const configFile: AgentConfigurationFile = {
         path: CURSOR_CLI_CONFIG_PATH,
         read: vi.fn().mockResolvedValue('not valid json'),
-        update: updateMock,
+        update: vi.fn(),
       };
 
-      await agent.preWorkspaceStart(createContext([configFile]));
-
-      expect(updateMock).toHaveBeenCalledOnce();
-      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
-      expect(written.model.modelId).toBe('gpt-4o');
-      expect(written.hasChangedDefaultModel).toBe(true);
+      await expect(agent.preWorkspaceStart(createContext([configFile]))).rejects.toThrow();
     });
 
-    test('normalizes non-object JSON to empty config', async () => {
+    test.each(['null', '"string"', '123', '[]'])('rejects non-object JSON: %s', async (payload: string) => {
       await activate(extensionContextMock);
       const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
 
-      for (const nonObject of ['null', '"string"', '123', '[]']) {
-        const updateMock = vi.fn();
-        const configFile: AgentConfigurationFile = {
-          path: CURSOR_CLI_CONFIG_PATH,
-          read: vi.fn().mockResolvedValue(nonObject),
-          update: updateMock,
-        };
+      const configFile: AgentConfigurationFile = {
+        path: CURSOR_CLI_CONFIG_PATH,
+        read: vi.fn().mockResolvedValue(payload),
+        update: vi.fn(),
+      };
 
-        await agent.preWorkspaceStart(createContext([configFile]));
-
-        expect(updateMock).toHaveBeenCalledOnce();
-        const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
-        expect(written.model.modelId).toBe('gpt-4o');
-        expect(written.hasChangedDefaultModel).toBe(true);
-      }
+      await expect(agent.preWorkspaceStart(createContext([configFile]))).rejects.toThrow();
     });
 
     test('does nothing when config file is not in context', async () => {
