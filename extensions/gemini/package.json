@@ -50,7 +50,8 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.81",
     "@google/genai": "^1.25.0",
-    "@openkaiden/api": "workspace:*"
+    "@openkaiden/api": "workspace:*",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "mkdirp": "^3.0.1",

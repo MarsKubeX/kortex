@@ -18,10 +18,13 @@
 
 import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents, provider } from '@openkaiden/api';
+import { z } from 'zod';
 
 import { Gemini } from './gemini';
 
 export const GEMINI_SETTINGS_PATH = '.gemini/settings.json';
+
+const GeminiSettingsSchema = z.record(z.string(), z.unknown()).catch({});
 
 export async function activate(extensionContext: ExtensionContext): Promise<void> {
   console.log('starting gemini extension');
@@ -60,17 +63,14 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
       }
 
       const content = await configFile.read();
-      let config: Record<string, unknown>;
+      let parsed: unknown;
       try {
-        const parsed: unknown = JSON.parse(content);
-        config =
-          typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-            ? (parsed as Record<string, unknown>)
-            : {};
+        parsed = JSON.parse(content);
       } catch {
-        config = {};
+        parsed = {};
       }
 
+      const config = GeminiSettingsSchema.parse(parsed);
       const modelName = context.model.model.label;
       config['model'] = {
         name: modelName,
