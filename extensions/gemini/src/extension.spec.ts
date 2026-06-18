@@ -155,40 +155,30 @@ describe('activate', () => {
       '123',
       'true',
       '[1, 2]',
-    ])('falls back to empty config when parsed JSON is non-object: %s', async (payload: string) => {
+    ])('rejects non-object JSON: %s', async (payload: string) => {
       await activate(extensionContextMock);
       const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
 
-      const updateMock = vi.fn();
       const configFile: AgentConfigurationFile = {
         path: GEMINI_SETTINGS_PATH,
         read: vi.fn().mockResolvedValue(payload),
-        update: updateMock,
+        update: vi.fn(),
       };
 
-      await agent.preWorkspaceStart(createContext([configFile]));
-
-      expect(updateMock).toHaveBeenCalledOnce();
-      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
-      expect(written.model.name).toBe('gemini-2.5-pro');
+      await expect(agent.preWorkspaceStart(createContext([configFile]))).rejects.toThrow();
     });
 
-    test('handles invalid JSON by starting with empty config', async () => {
+    test('rejects invalid JSON', async () => {
       await activate(extensionContextMock);
       const agent = vi.mocked(agents.registerAgent).mock.calls[0]![0];
 
-      const updateMock = vi.fn();
       const configFile: AgentConfigurationFile = {
         path: GEMINI_SETTINGS_PATH,
         read: vi.fn().mockResolvedValue('not valid json'),
-        update: updateMock,
+        update: vi.fn(),
       };
 
-      await agent.preWorkspaceStart(createContext([configFile]));
-
-      expect(updateMock).toHaveBeenCalledOnce();
-      const written = JSON.parse(updateMock.mock.calls[0]![0] as string);
-      expect(written.model.name).toBe('gemini-2.5-pro');
+      await expect(agent.preWorkspaceStart(createContext([configFile]))).rejects.toThrow();
     });
 
     test('does nothing when config file is not in context', async () => {

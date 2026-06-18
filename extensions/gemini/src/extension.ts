@@ -24,7 +24,9 @@ import { Gemini } from './gemini';
 
 export const GEMINI_SETTINGS_PATH = '.gemini/settings.json';
 
-const GeminiSettingsSchema = z.record(z.string(), z.unknown()).catch({});
+const GeminiSettingsSchema = z.looseObject({
+  model: z.looseObject({ name: z.string() }).optional(),
+});
 
 export async function activate(extensionContext: ExtensionContext): Promise<void> {
   console.log('starting gemini extension');
@@ -62,19 +64,9 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
         return;
       }
 
-      const content = await configFile.read();
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        parsed = {};
-      }
-
-      const config = GeminiSettingsSchema.parse(parsed);
+      const config = GeminiSettingsSchema.parse(JSON.parse(await configFile.read()));
       const modelName = context.model.model.label;
-      config['model'] = {
-        name: modelName,
-      };
+      config.model = { name: modelName };
 
       await configFile.update(JSON.stringify(config, undefined, 2));
     },
