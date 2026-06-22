@@ -564,6 +564,9 @@ importers:
       '@openkaiden/api':
         specifier: workspace:*
         version: link:../../packages/extension-api
+      zod:
+        specifier: ^4.3.5
+        version: 4.4.3
     devDependencies:
       mkdirp:
         specifier: ^3.0.1
