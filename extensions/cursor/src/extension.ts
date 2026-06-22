@@ -16,10 +16,26 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ExtensionContext } from '@openkaiden/api';
+import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents } from '@openkaiden/api';
+import { z } from 'zod';
 
 import { CursorExtension } from './cursor-extension';
+
+export const CURSOR_CLI_CONFIG_PATH = '.cursor/cli-config.json';
+
+const CursorModelSchema = z.looseObject({
+  modelId: z.string(),
+  displayModelId: z.string(),
+  displayName: z.string(),
+  displayNameShort: z.string(),
+  maxMode: z.boolean(),
+});
+
+const CursorCliConfigSchema = z.looseObject({
+  model: CursorModelSchema.optional(),
+  hasChangedDefaultModel: z.boolean().optional(),
+});
 
 let cursorExtension: CursorExtension | undefined;
 
@@ -37,13 +53,36 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
     },
     command: 'cursor',
     tags: ['Local'],
-    configurationFiles: [],
+    configurationFiles: [
+      {
+        path: CURSOR_CLI_CONFIG_PATH,
+        async read(): Promise<string> {
+          return '{}';
+        },
+      },
+    ],
     destinationSkillsFolder: '${HOME}/.cursor/skills',
     isSupportedModelType(type): boolean {
       return type.name === 'cursor';
     },
-    async preWorkspaceStart(): Promise<void> {
-      throw new Error('not implemented');
+    async preWorkspaceStart(context: AgentWorkspaceContext): Promise<void> {
+      const configFile = context.configurationFiles.find(f => f.path === CURSOR_CLI_CONFIG_PATH);
+      if (!configFile) {
+        return;
+      }
+
+      const config = CursorCliConfigSchema.parse(JSON.parse(await configFile.read()));
+      const modelName = context.model.model.label;
+      config.model = {
+        modelId: modelName,
+        displayModelId: modelName,
+        displayName: modelName,
+        displayNameShort: modelName,
+        maxMode: false,
+      };
+      config.hasChangedDefaultModel = true;
+
+      await configFile.update(JSON.stringify(config, undefined, 2));
     },
   });
   extensionContext.subscriptions.push(disposable);
