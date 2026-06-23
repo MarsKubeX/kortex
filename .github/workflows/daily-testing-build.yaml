@@ -126,9 +126,17 @@ jobs:
       ELECTRON_ENABLE_INSPECT: true
       GITHUB_TOKEN: ${{ secrets.KAIDEN_BOT_TOKEN }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        os: [windows-2022, windows-11-arm, ubuntu-24.04, macos-26]
+        include:
+          - os: windows-2022
+            windows_arch: x64
+          - os: windows-11-arm
+            windows_arch: arm64
+          - os: ubuntu-24.04
+            windows_arch: ''
+          - os: macos-26
+            windows_arch: ''
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -162,7 +170,40 @@ jobs:
 
       - name: Run Build and Compile on all platforms
         timeout-minutes: 60
-        run: pnpm compile:next
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.windows_arch }}" ]; then
+            pnpm exec cross-env MODE=production pnpm run build
+            # Target list is required: --x64 alone still builds both archs from config and
+            # lets windows-11-arm clobber setup-x64.exe on the shared GitHub release.
+            pnpm exec electron-builder build --publish always --config .electron-builder.config.cjs \
+              --win nsis:${{ matrix.windows_arch }} portable:${{ matrix.windows_arch }}
+          else
+            pnpm compile:next
+          fi
+
+      - name: Assert Windows release artifacts match runner arch
+        if: matrix.windows_arch != ''
+        shell: bash
+        run: |
+          shopt -s nullglob
+          echo "dist contents:"
+          ls -la dist/ || true
+
+          if [ "${{ matrix.windows_arch }}" = "x64" ]; then
+            forbidden=(dist/*-arm64.exe dist/*-setup-arm64.exe dist/*-setup.exe)
+          else
+            forbidden=(dist/*-x64.exe dist/*-setup-x64.exe dist/*-setup.exe)
+          fi
+
+          for pattern in "${forbidden[@]}"; do
+            for file in $pattern; do
+              echo "::error::${{ matrix.os }} must not publish ${file}"
+              exit 1
+            done
+          done
+
+          echo "Windows ${{ matrix.windows_arch }} artifacts look correct"
 
   release:
     needs: [tag, build]
