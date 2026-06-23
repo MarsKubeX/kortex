@@ -29,6 +29,7 @@ import type {
   GatewayInfo,
   GatewaySandboxes,
   OpenshellProviderInfo,
+  PolicyUpdateOptions,
   SandboxInfo,
 } from '/@api/openshell-gateway-info.js';
 import { GatewayInfoSchema, OpenshellProviderInfoSchema, SandboxInfoSchema } from '/@api/openshell-gateway-info.js';
@@ -44,6 +45,9 @@ import { GatewayInfoSchema, OpenshellProviderInfoSchema, SandboxInfoSchema } fro
  *   - `openshell sandbox delete`
  *   - `openshell sandbox connect`
  *   - `openshell --version`
+ *
+ * Policy commands:
+ *   - `openshell policy update`
  *
  * Gateway registration commands:
  *   - `openshell gateway add <endpoint>`
@@ -184,6 +188,30 @@ export class OpenshellCli {
 
   async connectSandbox(name: string): Promise<void> {
     await this.runCli(['sandbox', 'connect', name]);
+  }
+
+  // ── policy commands ──────────────────────────────────────────────
+
+  async policyUpdate(options: PolicyUpdateOptions): Promise<void> {
+    const args = ['policy', 'update', options.sandboxName];
+    if (options.removeRule) {
+      args.push('--remove-rule', options.removeRule);
+    }
+    if (options.ruleName) {
+      args.push('--rule-name', options.ruleName);
+    }
+    if (options.addEndpoints) {
+      for (const endpoint of options.addEndpoints) {
+        args.push('--add-endpoint', endpoint);
+      }
+    }
+    if (options.binary) {
+      args.push('--binary', options.binary);
+    }
+    if (options.wait) {
+      args.push('--wait');
+    }
+    await this.runCli(args);
   }
 
   async listSandboxesForGateway(gatewayName: string): Promise<GatewaySandboxes> {

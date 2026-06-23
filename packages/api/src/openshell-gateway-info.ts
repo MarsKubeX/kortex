@@ -91,6 +91,15 @@ export interface CreateSandboxOptions {
   noTty?: boolean;
 }
 
+export interface PolicyUpdateOptions {
+  sandboxName: string;
+  ruleName?: string;
+  removeRule?: string;
+  addEndpoints?: string[];
+  binary?: string;
+  wait?: boolean;
+}
+
 export interface GatewayAddOptions {
   endpoint: string;
   name?: string;
