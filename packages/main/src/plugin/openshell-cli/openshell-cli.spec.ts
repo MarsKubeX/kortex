@@ -928,7 +928,7 @@ describe('createProvider', () => {
     );
   });
 
-  test('rejects when credentials are empty', async () => {
+  test('rejects when credentials and flags are both empty', async () => {
     await expect(
       openshellCli.createProvider({
         name: 'my-openai',
@@ -938,6 +938,56 @@ describe('createProvider', () => {
     ).rejects.toThrow('credentials must not be empty');
 
     expect(exec.exec).not.toHaveBeenCalled();
+  });
+
+  test('includes flag entries', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
+
+    await openshellCli.createProvider({
+      name: 'my-vertex',
+      type: 'google-vertex-ai',
+      credentials: { GOOGLE_APPLICATION_CREDENTIALS: '/path/to/creds.json' },
+      flags: ['--from-gcloud-adc'],
+    });
+
+    expect(exec.exec).toHaveBeenCalledWith(
+      OPENSHELL_CLI_PATH,
+      [
+        'provider',
+        'create',
+        '--name',
+        'my-vertex',
+        '--type',
+        'google-vertex-ai',
+        '--credential',
+        'GOOGLE_APPLICATION_CREDENTIALS',
+        '--from-gcloud-adc',
+      ],
+      {
+        env: {
+          GOOGLE_APPLICATION_CREDENTIALS: '/path/to/creds.json',
+        },
+      },
+    );
+  });
+
+  test('accepts empty credentials when flags are provided', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
+
+    await openshellCli.createProvider({
+      name: 'my-vertex',
+      type: 'google-vertex-ai',
+      credentials: {},
+      flags: ['--from-gcloud-adc'],
+    });
+
+    expect(exec.exec).toHaveBeenCalledWith(
+      OPENSHELL_CLI_PATH,
+      ['provider', 'create', '--name', 'my-vertex', '--type', 'google-vertex-ai', '--from-gcloud-adc'],
+      { env: {} },
+    );
   });
 
   test('redacts credential and config values in logs', async () => {
