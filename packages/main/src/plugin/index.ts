@@ -142,7 +142,7 @@ import type { ContainerCreateOptions as PodmanContainerCreateOptions, PlayKubeIn
 import type { ListOrganizerItem } from '/@api/list-organizer.js';
 import type { ManifestCreateOptions, ManifestInspectInfo, ManifestPushOptions } from '/@api/manifest-info.js';
 import type { MCPRemoteServerInfo } from '/@api/mcp/mcp-server-info.js';
-import type { MCPSetupOptions } from '/@api/mcp/mcp-setup.js';
+import type { MCPSetupOptions, MCPSetupPackageOptions } from '/@api/mcp/mcp-setup.js';
 import type { Menu } from '/@api/menu.js';
 import type { NetworkInspectInfo } from '/@api/network-info.js';
 import type { NotificationCard, NotificationCardOptions } from '/@api/notification.js';
@@ -2402,6 +2402,13 @@ export class PluginSystem {
     );
 
     this.ipcHandle(
+      'mcp-registry:register',
+      async (_listener, serverId: string, options: MCPSetupPackageOptions): Promise<void> => {
+        await mcpRegistry.registerMCPServerOnly(serverId, options);
+      },
+    );
+
+    this.ipcHandle(
       'mcp-registry:getMcpRegistryServers',
       async (): Promise<readonly components['schemas']['ServerDetail'][]> => {
         return mcpRegistry.listMCPServersFromRegistries();
@@ -2430,6 +2437,7 @@ export class PluginSystem {
       'mcp-manager:removeMcpRemoteServer',
       async (_listener, key: string, options: { serverId: string; remoteId: number }): Promise<void> => {
         await mcpRegistry.deleteRemoteMcpFromConfiguration(options.serverId, options.remoteId);
+        await mcpRegistry.deletePackageFromConfiguration(options.serverId, options.remoteId);
         return mcpManager.removeMcpRemoteServer(key);
       },
     );

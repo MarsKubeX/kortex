@@ -140,22 +140,7 @@ export class MCPManager implements IAsyncDisposable {
   ): Promise<void> {
     const key = this.getKey(internalProviderId, serverId, setupType, index);
 
-    const wrapped = this.exchanges.createMiddleware(key, transport);
-
-    const client = await experimental_createMCPClient({ transport: wrapped });
-
-    console.log('[MCPManager] Registering MCP client for ', internalProviderId, ' with name ', connectionName);
-    this.#client.set(key, client);
-
-    const toolSet = await client.tools();
-    const tools = Object.fromEntries(
-      Object.entries(toolSet).map(([key, value]) => [
-        key,
-        {
-          description: value.description ?? '',
-        },
-      ]),
-    );
+    const tools = await this.createClientTools(key, transport);
 
     const mcpRemoteServerInfo: MCPRemoteServerInfo = {
       id: key,
@@ -171,6 +156,36 @@ export class MCPManager implements IAsyncDisposable {
     this.#mcps.push(mcpRemoteServerInfo);
 
     // broadcast new items
+    this.apiSender.send('mcp-manager-update');
+  }
+
+  public registerMCPWithoutClient(
+    internalProviderId: string,
+    serverId: string,
+    setupType: 'remote' | 'package',
+    index: number,
+    connectionName: string,
+    url?: string,
+    description?: string,
+    isValidSchema?: boolean,
+    commandSpec?: MCPCommandSpec,
+  ): void {
+    const key = this.getKey(internalProviderId, serverId, setupType, index);
+
+    const mcpRemoteServerInfo: MCPRemoteServerInfo = {
+      id: key,
+      infos: { internalProviderId, remoteId: index, serverId },
+      name: connectionName,
+      url: url ?? '',
+      setupType,
+      commandSpec,
+      description: description ?? '',
+      tools: {},
+      isValidSchema,
+      status: 'registered',
+    };
+    this.#mcps.push(mcpRemoteServerInfo);
+
     this.apiSender.send('mcp-manager-update');
   }
 
@@ -192,19 +207,40 @@ export class MCPManager implements IAsyncDisposable {
 
   public async removeMcpRemoteServer(key: string): Promise<void> {
     const instance = this.#client.get(key);
-    if (!instance) throw new Error(`cannot find MCP instance with key ${key}`);
+    if (instance) {
+      await instance.close();
+      this.#client.delete(key);
+      this.exchanges.clearExchanges(key);
+    }
 
-    // Close the client connection
-    await instance.close();
-
-    // remove the instance
-    this.#client.delete(key);
-    this.exchanges.clearExchanges(key);
-
-    // clear from the #mcps list
     this.#mcps = this.#mcps.filter(mcp => mcp.id !== key);
 
-    // broadcast new items
+    this.apiSender.send('mcp-manager-update');
+  }
+
+  public async addClient(key: string, transport: Transport): Promise<void> {
+    const server = this.get(key);
+    if (this.#client.has(key)) throw new Error(`MCP server ${key} is already started`);
+
+    server.tools = await this.createClientTools(key, transport);
+    server.status = undefined;
+
+    this.apiSender.send('mcp-manager-update');
+  }
+
+  public async removeClient(key: string): Promise<void> {
+    const server = this.get(key);
+
+    const instance = this.#client.get(key);
+    if (instance) {
+      await instance.close();
+      this.#client.delete(key);
+      this.exchanges.clearExchanges(key);
+    }
+
+    server.tools = {};
+    server.status = 'registered';
+
     this.apiSender.send('mcp-manager-update');
   }
 
@@ -216,5 +252,32 @@ export class MCPManager implements IAsyncDisposable {
   ): MCPRemoteServerInfo | undefined {
     const key = this.getKey(INTERNAL_PROVIDER_ID, serverId, type, index);
     return this.#mcps.find(mcp => mcp.id === key);
+  }
+
+  private async createClientTools(
+    key: string,
+    transport: Transport,
+  ): Promise<Record<string, { description?: string }>> {
+    const wrapped = this.exchanges.createMiddleware(key, transport);
+    const client = await experimental_createMCPClient({ transport: wrapped });
+
+    try {
+      const toolSet = await client.tools();
+      const tools = Object.fromEntries(
+        Object.entries(toolSet).map(([toolName, value]) => [
+          toolName,
+          {
+            description: value.description ?? '',
+          },
+        ]),
+      );
+
+      this.#client.set(key, client);
+      return tools;
+    } catch (error) {
+      await client.close().catch(console.error);
+      this.exchanges.clearExchanges(key);
+      throw error;
+    }
   }
 }

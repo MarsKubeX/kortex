@@ -37,7 +37,7 @@ import { ApiSenderType } from '/@api/api-sender/api-sender-type.js';
 import { IConfigurationNode, IConfigurationRegistry } from '/@api/configuration/models.js';
 import type { ValidatedServerDetail, ValidatedServerList, ValidatedServerResponse } from '/@api/mcp/mcp-server-info.js';
 import { MCPServerDetail } from '/@api/mcp/mcp-server-info.js';
-import { InputWithVariableResponse, MCPSetupOptions } from '/@api/mcp/mcp-setup.js';
+import { InputWithVariableResponse, MCPSetupOptions, MCPSetupPackageOptions } from '/@api/mcp/mcp-setup.js';
 
 import { Certificates } from '../certificates.js';
 import { Emitter } from '../events/emitter.js';
@@ -81,6 +81,7 @@ interface PackageStorageConfigFormat {
   runtimeArguments?: Array<string>;
   packageArguments?: Array<string>;
   environmentVariables?: Record<string, string>;
+  autoSpawn?: boolean;
 }
 
 type StorageConfigFormat = RemoteStorageConfigFormat | PackageStorageConfigFormat;
@@ -203,68 +204,61 @@ export class MCPRegistry {
       const configurations = await this.getConfigurations();
       console.log(`[MCPRegistry] found ${configurations.length} saved configurations`);
 
-      // serverId => config
-      const mapping: Map<string, StorageConfigFormat> = new Map(
-        configurations.map(config => [config.serverId, config]),
-      );
-
       const { servers } = await this.listMCPServersFromRegistry(registry.serverUrl);
       for (const rawServer of servers) {
         const server = this.enhanceServerDetail(rawServer.server);
         if (!server.serverId) {
           continue;
         }
-        const config = mapping.get(server.serverId);
-        if (!config) {
+        const matchingConfigs = configurations.filter(config => config.serverId === server.serverId);
+        if (matchingConfigs.length === 0) {
           continue;
         }
 
-        // dealing with remote config
-        if ('remoteId' in config) {
-          const remote = server.remotes?.[config.remoteId];
-          if (!remote) {
-            continue;
-          }
-
-          // client already exists ?
+        for (const config of matchingConfigs) {
           const existingServers = await this.mcpManager.listMCPRemoteServers();
-          const existing = existingServers.find(srv => srv.id.includes(server.serverId ?? 'unknown'));
+          const existing = this.findExistingServer(
+            existingServers,
+            server.serverId,
+            this.getSetupTypeFromConfig(config),
+            this.getConfigIndex(config),
+          );
           if (existing) {
             console.log(`[MCPRegistry] MCP client for server ${server.serverId} already exists, skipping`);
             continue;
           }
 
-          // create transport
-          const transport = new StreamableHTTPClientTransport(new URL(remote.url), {
-            requestInit: {
-              headers: config.headers,
-            },
-          });
+          if ('remoteId' in config) {
+            const remote = server.remotes?.[config.remoteId];
+            if (!remote) {
+              continue;
+            }
 
-          await this.mcpManager.registerMCPClient(
-            INTERNAL_PROVIDER_ID,
-            server.serverId,
-            'remote',
-            config.remoteId,
-            server.name,
-            transport,
-            remote.url,
-            server.description,
-            server.isValidSchema,
-          );
-        } else {
+            const transport = new StreamableHTTPClientTransport(new URL(remote.url), {
+              requestInit: {
+                headers: config.headers,
+              },
+            });
+
+            await this.mcpManager.registerMCPClient(
+              INTERNAL_PROVIDER_ID,
+              server.serverId,
+              'remote',
+              config.remoteId,
+              server.name,
+              transport,
+              remote.url,
+              server.description,
+              server.isValidSchema,
+            );
+            continue;
+          }
+
           const pack = server.packages?.[config.packageId];
           if (!pack) {
             continue;
           }
 
-          // client already exists ?
-          const existingServers = await this.mcpManager.listMCPRemoteServers();
-          const existing = existingServers.find(srv => srv.id.includes(server.serverId ?? 'unknown'));
-          if (existing) {
-            console.log(`[MCPRegistry] MCP client for server ${server.serverId} already exists, skipping`);
-            continue;
-          }
           const spawner = new MCPPackage({
             ...pack,
             packageArguments: config.packageArguments,
@@ -273,19 +267,34 @@ export class MCPRegistry {
           });
 
           const cmdSpec = spawner.buildCommandSpec();
-          const transport = await spawner.spawn();
-          await this.mcpManager.registerMCPClient(
-            INTERNAL_PROVIDER_ID,
-            server.serverId,
-            'package',
-            config.packageId,
-            server.name,
-            transport,
-            undefined,
-            server.description,
-            server.isValidSchema,
-            cmdSpec,
-          );
+
+          if (config.autoSpawn === false) {
+            this.mcpManager.registerMCPWithoutClient(
+              INTERNAL_PROVIDER_ID,
+              server.serverId,
+              'package',
+              config.packageId,
+              server.name,
+              undefined,
+              server.description,
+              server.isValidSchema,
+              cmdSpec,
+            );
+          } else {
+            const transport = await spawner.spawn();
+            await this.mcpManager.registerMCPClient(
+              INTERNAL_PROVIDER_ID,
+              server.serverId,
+              'package',
+              config.packageId,
+              server.name,
+              transport,
+              undefined,
+              server.description,
+              server.isValidSchema,
+              cmdSpec,
+            );
+          }
         }
       }
     });
@@ -441,14 +450,16 @@ export class MCPRegistry {
   }
 
   async setupMCPServer(serverId: string, options: MCPSetupOptions): Promise<void> {
-    // Get back the server
     const serverDetails = await this.listMCPServersFromRegistries();
     const serverDetail = serverDetails.find(server => server.serverId === serverId);
     if (!serverDetail) {
       throw new Error(`MCP server with id ${serverId} not found in remote registry`);
     }
 
-    let transport: Transport;
+    const existingServers = await this.mcpManager.listMCPRemoteServers();
+    const existing = this.findExistingServer(existingServers, serverId, options.type, options.index);
+
+    let transport: Transport | undefined;
     let config: StorageConfigFormat;
     let cmdSpec: CommandSpec | undefined;
 
@@ -478,6 +489,7 @@ export class MCPRegistry {
         config = {
           packageId: options.index,
           serverId: serverDetail.serverId,
+          autoSpawn: true,
           runtimeArguments: formatArguments(
             pack.runtimeArguments,
             Object.fromEntries(
@@ -515,11 +527,25 @@ export class MCPRegistry {
           environmentVariables: config.environmentVariables,
         });
         cmdSpec = spawner.buildCommandSpec();
+
+        if (existing) {
+          if (existing.status === 'registered') {
+            await this.saveConfiguration(config);
+            await this.startMCPServer(existing.id);
+            return;
+          }
+          throw new Error('MCP server is already spawned.');
+        }
+
         transport = await spawner.spawn();
         break;
       }
       default:
         throw new Error('invalid options type for setupMCPServer');
+    }
+
+    if (existing) {
+      throw new Error('MCP server is already spawned.');
     }
 
     // get values from the server detail
@@ -545,6 +571,185 @@ export class MCPRegistry {
   async resetMCPServer(serverId: string, setupType: 'remote' | 'package', remoteId: number): Promise<void> {
     await this.deleteRemoteMcpFromConfiguration(serverId, remoteId);
     return this.mcpManager.unregisterMCPClient(INTERNAL_PROVIDER_ID, serverId, setupType, remoteId);
+  }
+
+  async registerMCPServerOnly(serverId: string, options: MCPSetupPackageOptions): Promise<void> {
+    const serverDetails = await this.listMCPServersFromRegistries();
+    const serverDetail = serverDetails.find(server => server.serverId === serverId);
+    if (!serverDetail) {
+      throw new Error(`MCP server with id ${serverId} not found in remote registry`);
+    }
+
+    const pack = serverDetail.packages?.[options.index];
+    if (!pack) throw new Error('package not found');
+
+    const config: PackageStorageConfigFormat = {
+      packageId: options.index,
+      serverId: serverDetail.serverId,
+      autoSpawn: false,
+      runtimeArguments: formatArguments(
+        pack.runtimeArguments,
+        Object.fromEntries(
+          Object.entries(options.runtimeArguments).map(([key, response]) => [
+            key,
+            this.formatInputWithVariableResponse(response),
+          ]),
+        ),
+      ),
+      packageArguments: formatArguments(
+        pack.packageArguments,
+        Object.fromEntries(
+          Object.entries(options.packageArguments).map(([key, response]) => [
+            key,
+            this.formatInputWithVariableResponse(response),
+          ]),
+        ),
+      ),
+      environmentVariables: formatKeyValueInputs(
+        pack.environmentVariables,
+        Object.fromEntries(
+          Object.entries(options.environmentVariables).map(([key, response]) => [
+            key,
+            this.formatInputWithVariableResponse(response),
+          ]),
+        ),
+      ),
+    };
+
+    const spawner = new MCPPackage({
+      ...pack,
+      packageArguments: config.packageArguments,
+      runtimeArguments: config.runtimeArguments,
+      environmentVariables: config.environmentVariables,
+    });
+    const cmdSpec = spawner.buildCommandSpec();
+    const existingServers = await this.mcpManager.listMCPRemoteServers();
+    const existing = this.findExistingServer(existingServers, serverId, 'package', options.index);
+
+    if (existing) {
+      if (existing.status !== 'registered') {
+        await this.saveConfiguration(config);
+        await this.stopMCPServer(existing.id);
+        return;
+      }
+      throw new Error('MCP server is already registered.');
+    }
+
+    const { name, description, isValidSchema } = serverDetail;
+
+    this.mcpManager.registerMCPWithoutClient(
+      INTERNAL_PROVIDER_ID,
+      serverId,
+      'package',
+      options.index,
+      name,
+      undefined,
+      description,
+      isValidSchema,
+      cmdSpec,
+    );
+
+    await this.saveConfiguration(config);
+  }
+
+  async startMCPServer(key: string): Promise<void> {
+    const server = this.mcpManager.get(key);
+    if (server.setupType !== 'package') throw new Error('Only package MCP servers can be started.');
+    if (server.status !== 'registered') throw new Error('MCP server is already spawned.');
+
+    const { serverId, remoteId } = server.infos;
+
+    const configs = await this.getConfigurations();
+    const config = configs.find(
+      (c): c is PackageStorageConfigFormat => 'packageId' in c && c.serverId === serverId && c.packageId === remoteId,
+    );
+    if (!config) throw new Error(`No saved configuration found for MCP server ${serverId}`);
+
+    const serverDetails = await this.listMCPServersFromRegistries();
+    const serverDetail = serverDetails.find(s => s.serverId === serverId);
+    if (!serverDetail) throw new Error(`MCP server with id ${serverId} not found in remote registry`);
+
+    const pack = serverDetail.packages?.[remoteId];
+    if (!pack) throw new Error('package not found');
+
+    const spawner = new MCPPackage({
+      ...pack,
+      packageArguments: config.packageArguments,
+      runtimeArguments: config.runtimeArguments,
+      environmentVariables: config.environmentVariables,
+    });
+    const transport = await spawner.spawn();
+
+    await this.updateConfigurationAutoSpawn(serverId, remoteId, true);
+    try {
+      await this.mcpManager.addClient(key, transport);
+    } catch (err) {
+      await transport.close?.().catch(console.error);
+      await this.updateConfigurationAutoSpawn(serverId, remoteId, false);
+      throw err;
+    }
+  }
+
+  async stopMCPServer(key: string): Promise<void> {
+    const server = this.mcpManager.get(key);
+    if (server.setupType !== 'package') throw new Error('Only package MCP servers can be stopped.');
+    if (server.status === 'registered') throw new Error('MCP server is already stopped.');
+
+    const { serverId, remoteId } = server.infos;
+
+    await this.updateConfigurationAutoSpawn(serverId, remoteId, false);
+    try {
+      await this.mcpManager.removeClient(key);
+    } catch (err) {
+      await this.updateConfigurationAutoSpawn(serverId, remoteId, true);
+      throw err;
+    }
+  }
+
+  private async updateConfigurationAutoSpawn(serverId: string, packageId: number, autoSpawn: boolean): Promise<void> {
+    const configs = await this.getConfigurations();
+    const updated = configs.map(c => {
+      if ('packageId' in c && c.serverId === serverId && c.packageId === packageId) {
+        return { ...c, autoSpawn };
+      }
+      return c;
+    });
+    await this.safeStorage?.store(STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  async deletePackageFromConfiguration(serverId: string, packageId: number): Promise<void> {
+    const existingConfiguration = await this.getConfigurations();
+    const filtered = existingConfiguration.filter(
+      config => !('packageId' in config && config.serverId === serverId && config.packageId === packageId),
+    );
+    await this.safeStorage?.store(STORAGE_KEY, JSON.stringify(filtered));
+  }
+
+  private findExistingServer(
+    servers: Awaited<ReturnType<MCPManager['listMCPRemoteServers']>>,
+    serverId: string,
+    setupType: 'remote' | 'package',
+    index: number,
+  ): Awaited<ReturnType<MCPManager['listMCPRemoteServers']>>[number] | undefined {
+    return servers.find(
+      server => server.infos.serverId === serverId && server.setupType === setupType && server.infos.remoteId === index,
+    );
+  }
+
+  private getSetupTypeFromConfig(config: StorageConfigFormat): 'remote' | 'package' {
+    return 'remoteId' in config ? 'remote' : 'package';
+  }
+
+  private getConfigIndex(config: StorageConfigFormat): number {
+    return 'remoteId' in config ? config.remoteId : config.packageId;
+  }
+
+  private hasSameConfigTarget(left: StorageConfigFormat, right: StorageConfigFormat): boolean {
+    return (
+      left.serverId === right.serverId &&
+      this.getSetupTypeFromConfig(left) === this.getSetupTypeFromConfig(right) &&
+      this.getConfigIndex(left) === this.getConfigIndex(right)
+    );
   }
 
   protected formatInputWithVariableResponse(input: InputWithVariableResponse): string {
@@ -605,7 +810,8 @@ export class MCPRegistry {
 
   async saveConfiguration(config: StorageConfigFormat): Promise<void> {
     const existing = await this.getConfigurations();
-    await this.safeStorage?.store(STORAGE_KEY, JSON.stringify([...existing, config]));
+    const filtered = existing.filter(existingConfig => !this.hasSameConfigTarget(existingConfig, config));
+    await this.safeStorage?.store(STORAGE_KEY, JSON.stringify([...filtered, config]));
   }
 
   async deleteRemoteMcpFromConfiguration(serverId: string, remoteId: number): Promise<void> {
