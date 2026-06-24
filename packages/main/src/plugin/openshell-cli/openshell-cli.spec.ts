@@ -165,6 +165,19 @@ describe('createSandbox', () => {
     );
   });
 
+  test('includes repeatable --env flags when provided', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
+
+    await openshellCli.createSandbox({ env: { API_KEY: 'sk-test', DEBUG: '1' } });
+
+    expect(exec.exec).toHaveBeenCalledWith(
+      OPENSHELL_CLI_PATH,
+      ['sandbox', 'create', '--env', 'API_KEY=sk-test', '--env', 'DEBUG=1'],
+      undefined,
+    );
+  });
+
   test('includes --label flags when provided', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
@@ -230,6 +243,34 @@ describe('createSandbox', () => {
     expect(exec.exec).toHaveBeenCalledWith(
       OPENSHELL_CLI_PATH,
       ['sandbox', 'create', '--upload', '.agents/skills:.agents/skills', '--', 'bash'],
+      undefined,
+    );
+  });
+
+  test('redacts --env values in logs', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
+
+    await openshellCli.createSandbox({ env: { API_KEY: 'sk-secret-123' } });
+
+    const loggedMessage = logSpy.mock.calls[0]?.[0] as string;
+    expect(loggedMessage).not.toContain('sk-secret-123');
+    expect(loggedMessage).toContain('--env');
+    expect(loggedMessage).toContain('***');
+  });
+
+  test('places --env flags before -- command separator', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(mockExecResult(''));
+
+    await openshellCli.createSandbox({
+      env: { API_KEY: 'sk-test' },
+      command: ['bash'],
+    });
+
+    expect(exec.exec).toHaveBeenCalledWith(
+      OPENSHELL_CLI_PATH,
+      ['sandbox', 'create', '--env', 'API_KEY=sk-test', '--', 'bash'],
       undefined,
     );
   });
