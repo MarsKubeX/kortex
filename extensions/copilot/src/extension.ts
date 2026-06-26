@@ -16,8 +16,32 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ExtensionContext } from '@openkaiden/api';
+import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents } from '@openkaiden/api';
+import { z } from 'zod';
+
+const CopilotSettingsSchema = z.looseObject({
+  chat: z.looseObject({ model: z.string().optional() }).optional(),
+});
+
+const CopilotSettingsCodec = z.codec(z.string(), CopilotSettingsSchema, {
+  decode: (jsonString, ctx) => {
+    try {
+      return JSON.parse(jsonString);
+    } catch (err: unknown) {
+      ctx.issues.push({
+        code: 'invalid_format',
+        format: 'json',
+        input: jsonString,
+        message: err instanceof Error ? err.message : 'Invalid JSON',
+      });
+      return z.NEVER;
+    }
+  },
+  encode: value => JSON.stringify(value, undefined, 2),
+});
+
+export const COPILOT_SETTINGS_PATH = '.copilot/settings.json';
 
 export async function activate(extensionContext: ExtensionContext): Promise<void> {
   const disposable = agents.registerAgent({
@@ -39,13 +63,28 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
     command: 'copilot',
     acp: { args: ['--acp'] },
     tags: [],
-    configurationFiles: [],
     destinationSkillsFolder: '${HOME}/.copilot/skills',
+    configurationFiles: [
+      {
+        path: COPILOT_SETTINGS_PATH,
+        async read(): Promise<string> {
+          return '{}';
+        },
+      },
+    ],
     isSupportedModelType(type): boolean {
       return type.name !== 'vertexai';
     },
-    async preWorkspaceStart(): Promise<void> {
-      throw new Error('not implemented');
+    async preWorkspaceStart(context: AgentWorkspaceContext): Promise<void> {
+      const configFile = context.configurationFiles.find(f => f.path === COPILOT_SETTINGS_PATH);
+      if (!configFile) {
+        return;
+      }
+
+      const config = CopilotSettingsCodec.decode(await configFile.read());
+      config.chat = { ...config.chat, model: context.model.model.label };
+
+      await configFile.update(CopilotSettingsCodec.encode(config));
     },
   });
   extensionContext.subscriptions.push(disposable);
