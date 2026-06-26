@@ -435,7 +435,7 @@ describe('create – OpenShell mode', () => {
     expect(openshellCli.createSandbox).not.toHaveBeenCalled();
   });
 
-  test('calls policyUpdate twice for deny mode with hosts: remove then add', async () => {
+  test('calls policyUpdate with one endpoint per call for deny mode with hosts', async () => {
     const options = {
       ...defaultOptions,
       network: { mode: 'deny' as const, hosts: ['registry.npmjs.org', 'pypi.python.org'] },
@@ -775,6 +775,125 @@ describe('create – OpenShell mode', () => {
 
     const call = vi.mocked(openshellCli.createSandbox).mock.calls[0]![0];
     expect(call!.env).toBeUndefined();
+  });
+
+  test('applies model endpoint policy when model has an endpoint', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: { api_key: 'sk-test' },
+      llmMetadataName: 'openai',
+      endpoint: 'https://api.example.com/v1',
+    });
+    vi.mocked(secretManager.create).mockResolvedValue({ name: 'my-sandbox-openai' });
+
+    const options = { ...defaultOptions, model: 'openai::gpt-4o::https://api.example.com/v1' };
+    await manager.create(options);
+
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith({
+      sandboxName: 'my-sandbox',
+      removeRule: 'kdn-model',
+    });
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith({
+      sandboxName: 'my-sandbox',
+      ruleName: 'kdn-model',
+      addEndpoints: ['api.example.com:443'],
+      binary: '/**',
+      wait: true,
+    });
+  });
+
+  test('rewrites localhost model endpoint to host.openshell.internal', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: {},
+      llmMetadataName: 'ollama',
+      endpoint: 'http://localhost:11434/v1',
+    });
+
+    const options = { ...defaultOptions, model: 'ollama::qwen3::http://localhost:11434/v1' };
+    await manager.create(options);
+
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith({
+      sandboxName: 'my-sandbox',
+      ruleName: 'kdn-model',
+      addEndpoints: ['host.openshell.internal:11434'],
+      binary: '/**',
+      wait: true,
+    });
+  });
+
+  test('does not apply model policy when no model is configured', async () => {
+    await manager.create(defaultOptions);
+
+    expect(openshellCli.policyUpdate).not.toHaveBeenCalled();
+  });
+
+  test('does not apply model policy when model has no endpoint', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: { api_key: 'sk-test' },
+      llmMetadataName: 'anthropic',
+    });
+    vi.mocked(secretManager.create).mockResolvedValue({ name: 'my-sandbox-anthropic' });
+
+    const options = { ...defaultOptions, model: 'anthropic::claude-sonnet-4-20250514' };
+    await manager.create(options);
+
+    expect(openshellCli.policyUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ removeRule: 'kdn-model' }));
+  });
+
+  test('extracts endpoint from model ID when connectionInfo is unavailable', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue(undefined);
+
+    const options = { ...defaultOptions, model: 'ollama::qwen3:0.6b::http://localhost:11434/v1' };
+    await manager.create(options);
+
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith({
+      sandboxName: 'my-sandbox',
+      ruleName: 'kdn-model',
+      addEndpoints: ['host.openshell.internal:11434'],
+      binary: '/**',
+      wait: true,
+    });
+  });
+
+  test('swallows errors on model policy remove-only operation', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: {},
+      llmMetadataName: 'ollama',
+      endpoint: 'http://localhost:11434/v1',
+    });
+    vi.mocked(openshellCli.policyUpdate).mockImplementation(async op => {
+      if (op.removeRule === 'kdn-model' && !op.addEndpoints) {
+        throw new Error('rule not found');
+      }
+    });
+
+    const options = { ...defaultOptions, model: 'ollama::qwen3::http://localhost:11434/v1' };
+    await expect(manager.create(options)).resolves.toEqual({ id: 'my-sandbox' });
+  });
+
+  test('applies both network and model policies together', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: { api_key: 'sk-test' },
+      llmMetadataName: 'openai',
+      endpoint: 'https://api.openai.com/v1',
+    });
+    vi.mocked(secretManager.create).mockResolvedValue({ name: 'my-sandbox-openai' });
+
+    const options = {
+      ...defaultOptions,
+      model: 'openai::gpt-4o::https://api.openai.com/v1',
+      network: { mode: 'deny' as const, hosts: ['registry.npmjs.org'] },
+    };
+
+    await manager.create(options);
+
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith(expect.objectContaining({ removeRule: 'kdn-network' }));
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ ruleName: 'kdn-network', addEndpoints: expect.any(Array) }),
+    );
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith(expect.objectContaining({ removeRule: 'kdn-model' }));
+    expect(openshellCli.policyUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ ruleName: 'kdn-model', addEndpoints: ['api.openai.com:443'] }),
+    );
   });
 });
 

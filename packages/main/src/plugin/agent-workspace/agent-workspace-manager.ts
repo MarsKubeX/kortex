@@ -32,7 +32,10 @@ import { WritableConfigurationFile } from '/@/plugin/agent-workspace/writable-co
 import { IPCHandle, WebContentsType } from '/@/plugin/api.js';
 import { FilesystemMonitoring } from '/@/plugin/filesystem-monitoring.js';
 import { OpenshellCli } from '/@/plugin/openshell-cli/openshell-cli.js';
-import { buildNetworkPolicyOperations } from '/@/plugin/openshell-cli/openshell-network-policy.js';
+import {
+  buildModelPolicyOperations,
+  buildNetworkPolicyOperations,
+} from '/@/plugin/openshell-cli/openshell-network-policy.js';
 import { ProviderRegistry } from '/@/plugin/provider-registry.js';
 import { SafeStorageRegistry } from '/@/plugin/safe-storage/safe-storage-registry.js';
 import { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
@@ -138,7 +141,7 @@ export class AgentWorkspaceManager implements Disposable {
       : undefined;
 
     const modelName = options.model?.split('::')[1];
-    const endpoint = connectionInfo?.endpoint;
+    const endpoint = connectionInfo?.endpoint ?? options.model?.split('::')[2] ?? undefined;
 
     const workspace = await writeWorkspaceConfig(options);
     workspace.environment ??= [];
@@ -220,6 +223,21 @@ export class AgentWorkspaceManager implements Disposable {
             }
             throw err;
           }
+        }
+      }
+    }
+
+    if (endpoint) {
+      const modelOps = buildModelPolicyOperations(sandboxName, endpoint);
+      for (const op of modelOps) {
+        if (op.removeRule && !op.addEndpoints) {
+          try {
+            await this.openshellCli.policyUpdate(op);
+          } catch {
+            // Rule may not exist on a fresh sandbox — ignore
+          }
+        } else {
+          await this.openshellCli.policyUpdate(op);
         }
       }
     }
