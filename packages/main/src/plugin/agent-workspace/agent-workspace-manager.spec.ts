@@ -870,6 +870,23 @@ describe('create – OpenShell mode', () => {
     await expect(manager.create(options)).resolves.toEqual({ id: 'my-sandbox' });
   });
 
+  test('deletes sandbox when model policy add fails', async () => {
+    vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
+      credentials: {},
+      llmMetadataName: 'ollama',
+      endpoint: 'http://localhost:11434/v1',
+    });
+    vi.mocked(openshellCli.policyUpdate).mockImplementation(async op => {
+      if (op.ruleName === 'kdn-model' && op.addEndpoints) {
+        throw new Error('policy add failed');
+      }
+    });
+
+    const options = { ...defaultOptions, model: 'ollama::qwen3::http://localhost:11434/v1' };
+    await expect(manager.create(options)).rejects.toThrow('policy add failed');
+    expect(openshellCli.deleteSandbox).toHaveBeenCalledWith('my-sandbox');
+  });
+
   test('applies both network and model policies together', async () => {
     vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
       credentials: { api_key: 'sk-test' },

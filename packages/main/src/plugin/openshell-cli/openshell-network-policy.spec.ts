@@ -191,6 +191,17 @@ describe('parseModelEndpoint', () => {
   test('returns undefined for empty string', () => {
     expect(parseModelEndpoint('')).toBeUndefined();
   });
+
+  test('returns undefined for unknown scheme without explicit port', () => {
+    expect(parseModelEndpoint('ftp://files.example.com/data')).toBeUndefined();
+  });
+
+  test('parses unknown scheme when explicit port is provided', () => {
+    expect(parseModelEndpoint('ftp://files.example.com:2121/data')).toEqual({
+      host: 'files.example.com',
+      port: 2121,
+    });
+  });
 });
 
 describe('buildModelPolicyOperations', () => {
