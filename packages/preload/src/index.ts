@@ -50,7 +50,6 @@ import type {
   AgentWorkspaceCreateOptions,
   AgentWorkspaceId,
   AgentWorkspaceSummary,
-  CliInfo,
 } from '/@api/agent-workspace-info';
 import type { ApiSenderType } from '/@api/api-sender/api-sender-type';
 import type { AuthenticationProviderInfo } from '/@api/authentication/authentication';
@@ -329,11 +328,6 @@ export function initExposure(): void {
     return ipcInvoke('container-provider-registry:listPods');
   });
 
-  // CLI Info
-  contextBridge.exposeInMainWorld('getCliInfo', async (): Promise<CliInfo> => {
-    return ipcInvoke('agent-workspace:getCliInfo');
-  });
-
   // Agent Workspaces
   contextBridge.exposeInMainWorld('checkAgentWorkspaceConfigExists', async (sourcePath: string): Promise<boolean> => {
     return ipcInvoke('agent-workspace:checkConfigExists', sourcePath);
@@ -345,10 +339,6 @@ export function initExposure(): void {
       return ipcInvoke('agent-workspace:create', options);
     },
   );
-
-  contextBridge.exposeInMainWorld('listAgentWorkspaces', async (): Promise<AgentWorkspaceSummary[]> => {
-    return ipcInvoke('agent-workspace:list');
-  });
 
   contextBridge.exposeInMainWorld('removeAgentWorkspace', async (id: string): Promise<AgentWorkspaceId> => {
     return ipcInvoke('agent-workspace:remove', id);
