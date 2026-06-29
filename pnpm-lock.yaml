@@ -433,6 +433,12 @@ importers:
       '@openkaiden/api':
         specifier: workspace:*
         version: link:../../packages/extension-api
+      smol-toml:
+        specifier: ^1.6.1
+        version: 1.6.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       adm-zip:
         specifier: ^0.5.16
