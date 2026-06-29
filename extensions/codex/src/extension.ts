@@ -16,8 +16,25 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 
-import type { ExtensionContext } from '@openkaiden/api';
+import type { AgentWorkspaceContext, ExtensionContext } from '@openkaiden/api';
 import { agents } from '@openkaiden/api';
+import { parse, stringify } from 'smol-toml';
+import { z } from 'zod';
+
+export const CODEX_CONFIG_PATH = '.codex/config.toml';
+
+const McpServerEntrySchema = z.looseObject({
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  url: z.string().optional(),
+  http_headers: z.record(z.string(), z.string()).optional(),
+});
+
+const CodexConfigSchema = z.looseObject({
+  model: z.string().optional(),
+  mcp_servers: z.record(z.string(), McpServerEntrySchema).optional(),
+});
 
 export async function activate(extensionContext: ExtensionContext): Promise<void> {
   const disposable = agents.registerAgent({
@@ -29,13 +46,58 @@ export async function activate(extensionContext: ExtensionContext): Promise<void
       logo: { dark: './icon.png', light: './icon.png' },
     },
     command: 'codex',
-    configurationFiles: [],
+    configurationFiles: [
+      {
+        path: CODEX_CONFIG_PATH,
+        async read(): Promise<string> {
+          return '';
+        },
+      },
+    ],
     destinationSkillsFolder: '${HOME}/.agents/skills',
     isSupportedModelType(type): boolean {
       return type.name === 'openai';
     },
-    async preWorkspaceStart(): Promise<void> {
-      throw new Error('not implemented');
+    async preWorkspaceStart(context: AgentWorkspaceContext): Promise<void> {
+      const configFile = context.configurationFiles.find(f => f.path === CODEX_CONFIG_PATH);
+      if (!configFile) {
+        return;
+      }
+
+      const raw = await configFile.read();
+      const config = CodexConfigSchema.parse(raw ? parse(raw) : {});
+
+      config.model = context.model.model.label;
+
+      const mcpServers = context.workspace.mcp?.servers;
+      const mcpCommands = context.workspace.mcp?.commands;
+
+      if (mcpServers?.length || mcpCommands?.length) {
+        const servers = config.mcp_servers ?? {};
+
+        for (const cmd of mcpCommands ?? []) {
+          const entry: Record<string, unknown> = {
+            command: cmd.command,
+            args: cmd.args ?? [],
+          };
+          if (cmd.env && Object.keys(cmd.env).length > 0) {
+            entry['env'] = cmd.env;
+          }
+          servers[cmd.name] = entry;
+        }
+
+        for (const srv of mcpServers ?? []) {
+          const entry: Record<string, unknown> = { url: srv.url };
+          if (srv.headers && Object.keys(srv.headers).length > 0) {
+            entry['http_headers'] = srv.headers;
+          }
+          servers[srv.name] = entry;
+        }
+
+        config.mcp_servers = servers;
+      }
+
+      await configFile.update(stringify(config));
     },
   });
   extensionContext.subscriptions.push(disposable);
