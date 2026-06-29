@@ -31,6 +31,7 @@ import type {
   OpenshellProviderInfo,
   PolicyUpdateOptions,
   SandboxInfo,
+  SetInferenceOptions,
 } from '/@api/openshell-gateway-info.js';
 import { GatewayInfoSchema, OpenshellProviderInfoSchema, SandboxInfoSchema } from '/@api/openshell-gateway-info.js';
 
@@ -317,7 +318,7 @@ export class OpenshellCli {
       throw new Error('credentials must not be empty');
     }
     const args = ['provider', 'create', '--name', options.name, '--type', options.type];
-    const env: Record<string, string> = {};
+    const env: Record<string, string> = options.env ?? {};
     for (const [key, value] of Object.entries(options.credentials)) {
       env[key] = value;
       args.push('--credential', key);
@@ -335,6 +336,13 @@ export class OpenshellCli {
     await this.runCli(args, { env });
   }
 
+  async setInference(options: SetInferenceOptions): Promise<void> {
+    return this.runCli(['inference', 'set', '--provider', options.provider, '--model', options.model, '--no-verify']);
+  }
+
+  async enableV2Provider(sandboxName: string): Promise<void> {
+    return this.runCli(['settings', 'set', '--key', 'providers_v2_enabled', '--value', 'true', '--yes', sandboxName]);
+  }
   // ── helpers ───────────────────────────────────────────────────────
 
   private async runCli(args: string[], options?: { redact?: boolean; env?: { [p: string]: string } }): Promise<void> {

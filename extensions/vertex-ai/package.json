@@ -41,7 +41,13 @@
           "description": "Vertex AI provider type",
           "hidden": true
         },
-        "vertex-ai.connection.token": {
+        "vertex-ai.connection._flags": {
+          "type": "string",
+          "scope": "InferenceProviderConnection",
+          "description": "Vertex AI provider flag",
+          "hidden": true
+        },
+        "vertex-ai.connection.GOOGLE_APPLICATION_CREDENTIALS": {
           "type": "string",
           "scope": "InferenceProviderConnection",
           "description": "Credentials secret reference",
