@@ -35,6 +35,7 @@ import { OpenshellCli } from '/@/plugin/openshell-cli/openshell-cli.js';
 import {
   buildModelPolicyOperations,
   buildNetworkPolicyOperations,
+  rewriteLocalhostUrl,
 } from '/@/plugin/openshell-cli/openshell-network-policy.js';
 import { ProviderRegistry } from '/@/plugin/provider-registry.js';
 import { SafeStorageRegistry } from '/@/plugin/safe-storage/safe-storage-registry.js';
@@ -141,7 +142,8 @@ export class AgentWorkspaceManager implements Disposable {
       : undefined;
 
     const modelName = options.model?.split('::')[1];
-    const endpoint = connectionInfo?.endpoint ?? options.model?.split('::')[2] ?? undefined;
+    const rawEndpoint = connectionInfo?.endpoint ?? options.model?.split('::')[2] ?? undefined;
+    const endpoint = rawEndpoint ? rewriteLocalhostUrl(rawEndpoint) : undefined;
 
     const workspace = await writeWorkspaceConfig(options);
     workspace.environment ??= [];

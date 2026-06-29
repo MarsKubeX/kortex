@@ -802,6 +802,8 @@ describe('create – OpenShell mode', () => {
   });
 
   test('rewrites localhost model endpoint to host.openshell.internal', async () => {
+    const preWorkspaceStart = vi.fn();
+    vi.mocked(agentRegistry.getAgentRegistration).mockReturnValue({ ...mockAgent, preWorkspaceStart });
     vi.mocked(providerRegistry.getInferenceConnectionCredentials).mockReturnValue({
       credentials: {},
       llmMetadataName: 'ollama',
@@ -811,6 +813,13 @@ describe('create – OpenShell mode', () => {
     const options = { ...defaultOptions, model: 'ollama::qwen3::http://localhost:11434/v1' };
     await manager.create(options);
 
+    expect(preWorkspaceStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: expect.objectContaining({
+          endpoint: 'http://host.openshell.internal:11434/v1',
+        }),
+      }),
+    );
     expect(openshellCli.policyUpdate).toHaveBeenCalledWith({
       sandboxName: 'my-sandbox',
       ruleName: 'kdn-model',
