@@ -32,7 +32,11 @@ import { WritableConfigurationFile } from '/@/plugin/agent-workspace/writable-co
 import { IPCHandle, WebContentsType } from '/@/plugin/api.js';
 import { FilesystemMonitoring } from '/@/plugin/filesystem-monitoring.js';
 import { OpenshellCli } from '/@/plugin/openshell-cli/openshell-cli.js';
-import { buildNetworkPolicyOperations } from '/@/plugin/openshell-cli/openshell-network-policy.js';
+import {
+  buildModelPolicyOperations,
+  buildNetworkPolicyOperations,
+  rewriteLocalhostUrl,
+} from '/@/plugin/openshell-cli/openshell-network-policy.js';
 import { ProviderRegistry } from '/@/plugin/provider-registry.js';
 import { SafeStorageRegistry } from '/@/plugin/safe-storage/safe-storage-registry.js';
 import { SecretManager } from '/@/plugin/secret-manager/secret-manager.js';
@@ -47,7 +51,7 @@ import type {
 import { ApiSenderType } from '/@api/api-sender/api-sender-type.js';
 import type { IConfigurationNode } from '/@api/configuration/models.js';
 import { IConfigurationRegistry } from '/@api/configuration/models.js';
-import type { GatewaySandboxes } from '/@api/openshell-gateway-info.js';
+import type { GatewaySandboxes, PolicyUpdateOptions } from '/@api/openshell-gateway-info.js';
 import { AGENT_LABEL, decodeWorkspaceLabels, WORKSPACE_LABEL } from '/@api/openshell-gateway-info.js';
 import type { SecretValue } from '/@api/secret-info.js';
 
@@ -138,7 +142,8 @@ export class AgentWorkspaceManager implements Disposable {
       : undefined;
 
     const modelName = options.model?.split('::')[1];
-    const endpoint = connectionInfo?.endpoint;
+    const rawEndpoint = connectionInfo?.endpoint ?? options.model?.split('::')[2] ?? undefined;
+    const endpoint = rawEndpoint ? rewriteLocalhostUrl(rawEndpoint) : undefined;
 
     const workspace = await writeWorkspaceConfig(options);
     workspace.environment ??= [];
@@ -204,29 +209,43 @@ export class AgentWorkspaceManager implements Disposable {
     const finalNetwork = workspace.network;
     if (finalNetwork) {
       const operations = buildNetworkPolicyOperations(sandboxName, finalNetwork);
-      for (const op of operations) {
-        if (op.removeRule && !op.addEndpoints) {
-          try {
-            await this.openshellCli.policyUpdate(op);
-          } catch {
-            // Rule may not exist on a fresh sandbox — ignore, matching kdn behavior
-          }
-        } else {
-          try {
-            await this.openshellCli.policyUpdate(op);
-          } catch (err) {
-            try {
-              await this.openshellCli.deleteSandbox(sandboxName);
-            } catch {
-              // best-effort rollback; preserve original failure
-            }
-            throw err;
-          }
-        }
-      }
+      await this.applyPolicyOperations(sandboxName, operations);
+    }
+
+    if (endpoint) {
+      const modelOps = buildModelPolicyOperations(sandboxName, endpoint);
+      await this.applyPolicyOperations(sandboxName, modelOps);
     }
 
     return { id: sandboxName };
+  }
+
+  /**
+   * Applies a sequence of policy operations to a sandbox, rolling back
+   * (deleting the sandbox) if any add-endpoint operation fails.
+   */
+  private async applyPolicyOperations(sandboxName: string, operations: PolicyUpdateOptions[]): Promise<void> {
+    for (const op of operations) {
+      if (op.removeRule && !op.addEndpoints) {
+        try {
+          await this.openshellCli.policyUpdate(op);
+        } catch {
+          // Rule may not exist on a fresh sandbox — ignore
+        }
+        continue;
+      }
+
+      try {
+        await this.openshellCli.policyUpdate(op);
+      } catch (err) {
+        try {
+          await this.openshellCli.deleteSandbox(sandboxName);
+        } catch {
+          // best-effort rollback; preserve original failure
+        }
+        throw err;
+      }
+    }
   }
 
   async checkWorkspaceConfigExists(sourcePath: string): Promise<boolean> {

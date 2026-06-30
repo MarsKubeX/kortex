@@ -18,7 +18,14 @@
 
 import { describe, expect, test } from 'vitest';
 
-import { buildNetworkPolicyEndpoints, buildNetworkPolicyOperations } from './openshell-network-policy.js';
+import {
+  buildModelPolicyOperations,
+  buildNetworkPolicyEndpoints,
+  buildNetworkPolicyOperations,
+  OPENSHELL_CONTAINER_HOST,
+  parseModelEndpoint,
+  rewriteLocalhostUrl,
+} from './openshell-network-policy.js';
 
 describe('buildNetworkPolicyEndpoints', () => {
   test('returns undefined for mode allow', () => {
@@ -84,7 +91,7 @@ describe('buildNetworkPolicyOperations', () => {
     expect(ops[0]).toEqual({ sandboxName: 'my-sandbox', removeRule: 'kdn-network' });
   });
 
-  test('returns remove then add operations for deny mode with hosts', () => {
+  test('returns remove then one add per endpoint for deny mode with hosts', () => {
     const ops = buildNetworkPolicyOperations('my-sandbox', {
       mode: 'deny',
       hosts: ['registry.npmjs.org'],
@@ -113,6 +120,139 @@ describe('buildNetworkPolicyOperations', () => {
       mode: 'deny',
       hosts: ['example.com'],
     });
+
+    expect(ops[0]!.sandboxName).toBe('test-sandbox');
+    expect(ops[1]!.sandboxName).toBe('test-sandbox');
+  });
+});
+
+describe('rewriteLocalhostUrl', () => {
+  test('rewrites localhost to host.openshell.internal', () => {
+    expect(rewriteLocalhostUrl('http://localhost:11434/v1')).toBe(`http://${OPENSHELL_CONTAINER_HOST}:11434/v1`);
+  });
+
+  test('rewrites 127.0.0.1 to host.openshell.internal', () => {
+    expect(rewriteLocalhostUrl('http://127.0.0.1:11434/v1')).toBe(`http://${OPENSHELL_CONTAINER_HOST}:11434/v1`);
+  });
+
+  test('rewrites 0.0.0.0 to host.openshell.internal', () => {
+    expect(rewriteLocalhostUrl('http://0.0.0.0:8080/v1')).toBe(`http://${OPENSHELL_CONTAINER_HOST}:8080/v1`);
+  });
+
+  test('does not rewrite external URLs', () => {
+    expect(rewriteLocalhostUrl('https://api.example.com/v1')).toBe('https://api.example.com/v1');
+  });
+
+  test('returns invalid strings unchanged', () => {
+    expect(rewriteLocalhostUrl('not-a-url')).toBe('not-a-url');
+  });
+});
+
+describe('parseModelEndpoint', () => {
+  test('parses HTTPS URL with default port', () => {
+    expect(parseModelEndpoint('https://api.example.com/v1')).toEqual({
+      host: 'api.example.com',
+      port: 443,
+    });
+  });
+
+  test('parses HTTP URL with default port', () => {
+    expect(parseModelEndpoint('http://api.example.com/v1')).toEqual({
+      host: 'api.example.com',
+      port: 80,
+    });
+  });
+
+  test('parses URL with explicit port', () => {
+    expect(parseModelEndpoint('https://api.example.com:8443/v1')).toEqual({
+      host: 'api.example.com',
+      port: 8443,
+    });
+  });
+
+  test('rewrites localhost and parses', () => {
+    expect(parseModelEndpoint('http://localhost:11434/v1')).toEqual({
+      host: OPENSHELL_CONTAINER_HOST,
+      port: 11434,
+    });
+  });
+
+  test('rewrites 127.0.0.1 and parses', () => {
+    expect(parseModelEndpoint('http://127.0.0.1:11434/v1')).toEqual({
+      host: OPENSHELL_CONTAINER_HOST,
+      port: 11434,
+    });
+  });
+
+  test('returns undefined for invalid URL', () => {
+    expect(parseModelEndpoint('not-a-url')).toBeUndefined();
+  });
+
+  test('returns undefined for empty string', () => {
+    expect(parseModelEndpoint('')).toBeUndefined();
+  });
+
+  test('returns undefined for unknown scheme without explicit port', () => {
+    expect(parseModelEndpoint('ftp://files.example.com/data')).toBeUndefined();
+  });
+
+  test('parses unknown scheme when explicit port is provided', () => {
+    expect(parseModelEndpoint('ftp://files.example.com:2121/data')).toEqual({
+      host: 'files.example.com',
+      port: 2121,
+    });
+  });
+});
+
+describe('buildModelPolicyOperations', () => {
+  test('returns remove then add for external endpoint', () => {
+    const ops = buildModelPolicyOperations('my-sandbox', 'https://api.example.com/v1');
+
+    expect(ops).toHaveLength(2);
+    expect(ops[0]).toEqual({ sandboxName: 'my-sandbox', removeRule: 'kdn-model' });
+    expect(ops[1]).toEqual({
+      sandboxName: 'my-sandbox',
+      ruleName: 'kdn-model',
+      addEndpoints: ['api.example.com:443'],
+      binary: '/**',
+      wait: true,
+    });
+  });
+
+  test('rewrites localhost endpoint to host.openshell.internal', () => {
+    const ops = buildModelPolicyOperations('my-sandbox', 'http://localhost:11434/v1');
+
+    expect(ops).toHaveLength(2);
+    expect(ops[1]).toEqual({
+      sandboxName: 'my-sandbox',
+      ruleName: 'kdn-model',
+      addEndpoints: [`${OPENSHELL_CONTAINER_HOST}:11434`],
+      binary: '/**',
+      wait: true,
+    });
+  });
+
+  test('rewrites 127.0.0.1 endpoint to host.openshell.internal', () => {
+    const ops = buildModelPolicyOperations('my-sandbox', 'http://127.0.0.1:11434/v1');
+
+    expect(ops[1]!.addEndpoints).toEqual([`${OPENSHELL_CONTAINER_HOST}:11434`]);
+  });
+
+  test('returns remove-only for invalid endpoint', () => {
+    const ops = buildModelPolicyOperations('my-sandbox', 'not-a-url');
+
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toEqual({ sandboxName: 'my-sandbox', removeRule: 'kdn-model' });
+  });
+
+  test('uses explicit port from URL', () => {
+    const ops = buildModelPolicyOperations('my-sandbox', 'https://api.example.com:8443/v1');
+
+    expect(ops[1]!.addEndpoints).toEqual(['api.example.com:8443']);
+  });
+
+  test('uses the provided sandbox name', () => {
+    const ops = buildModelPolicyOperations('test-sandbox', 'https://api.example.com/v1');
 
     expect(ops[0]!.sandboxName).toBe('test-sandbox');
     expect(ops[1]!.sandboxName).toBe('test-sandbox');

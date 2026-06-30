@@ -123,6 +123,11 @@ export type OpenshellPolicy = z.output<typeof OpenshellPolicySchema>;
 // ── Policy endpoint builder ───────────────────────────────────────
 
 const NETWORK_RULE_NAME = 'kdn-network';
+const MODEL_RULE_NAME = 'kdn-model';
+
+export const OPENSHELL_CONTAINER_HOST = 'host.openshell.internal';
+
+const LOCALHOST_ALIASES = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'];
 
 export function buildNetworkPolicyEndpoints(network: NetworkConfiguration): string[] | undefined {
   if (network.mode === 'allow') {
@@ -163,4 +168,94 @@ export function buildNetworkPolicyOperations(
   }
 
   return operations;
+}
+
+// ── Model endpoint policy ─────────────────────────────────────────
+
+export interface ModelEndpoint {
+  host: string;
+  port: number;
+}
+
+/**
+ * Rewrites localhost URLs to {@link OPENSHELL_CONTAINER_HOST} so the
+ * sandbox can reach host-local model servers (e.g. Ollama).
+ */
+export function rewriteLocalhostUrl(rawUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return rawUrl;
+  }
+
+  if (!LOCALHOST_ALIASES.includes(parsed.hostname.toLowerCase())) {
+    return rawUrl;
+  }
+
+  parsed.hostname = OPENSHELL_CONTAINER_HOST;
+  return parsed.toString();
+}
+
+/**
+ * Extracts host and port from an inference endpoint URL. Localhost
+ * aliases are rewritten to {@link OPENSHELL_CONTAINER_HOST}.
+ */
+export function parseModelEndpoint(endpoint: string): ModelEndpoint | undefined {
+  const rewritten = rewriteLocalhostUrl(endpoint);
+  let parsed: URL;
+  try {
+    parsed = new URL(rewritten);
+  } catch {
+    return undefined;
+  }
+
+  if (!parsed.hostname) {
+    return undefined;
+  }
+
+  let port: number;
+  if (parsed.port) {
+    port = Number(parsed.port);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      return undefined;
+    }
+  } else {
+    if (parsed.protocol === 'https:') {
+      port = 443;
+    } else if (parsed.protocol === 'http:') {
+      port = 80;
+    } else {
+      return undefined;
+    }
+  }
+
+  return { host: parsed.hostname, port };
+}
+
+/**
+ * Builds {@link PolicyUpdateOptions} to allow the sandbox to reach
+ * the model inference endpoint. Follows the pattern from the issue:
+ * `openshell policy update <sandbox> --add-endpoint <host>:<port> --binary '**'`
+ */
+export function buildModelPolicyOperations(sandboxName: string, endpoint: string): PolicyUpdateOptions[] {
+  const removeOp: PolicyUpdateOptions = {
+    sandboxName,
+    removeRule: MODEL_RULE_NAME,
+  };
+
+  const parsed = parseModelEndpoint(endpoint);
+  if (!parsed) {
+    return [removeOp];
+  }
+
+  const addOp: PolicyUpdateOptions = {
+    sandboxName,
+    ruleName: MODEL_RULE_NAME,
+    addEndpoints: [`${parsed.host}:${parsed.port}`],
+    binary: '/**',
+    wait: true,
+  };
+
+  return [removeOp, addOp];
 }
