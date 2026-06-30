@@ -183,8 +183,8 @@ export class CliToolRegistry {
       displayName: cliTool.displayName,
       markdownDescription: cliTool.markdownDescription,
       images: cliTool.images,
-      version: cliTool.version,
       path: cliTool.path,
+      version: cliTool.version,
       extensionInfo: {
         id: cliTool.extensionInfo.id,
         label: cliTool.extensionInfo.label,
